@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-04-21
+
+### Fixed
+
+- Forward the full workflow environment to the `cdk-insights` CLI subprocess. The previous `ENV_ALLOWLIST` (PATH, HOME, GITHUB_*, etc.) stripped every variable a non-trivial CDK app reads at synth time — AWS credentials (`AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`), CDK targeting (`CDK_DEFAULT_ACCOUNT`, `CDK_DEFAULT_REGION`), and project-specific config (e.g. `STAGE`, `STRIPE_EVENT_SOURCE_NAME`, `TARGET_EVENT_BUS_NAME`). Users saw Zod / dotenv / `ParameterNotFound` errors during `cdk synth` because the CLI subprocess couldn't see the env vars their workflow had set. The CLI now inherits the workflow environment; secrets never leave the runner and the sensitive-data scanner redacts template contents before transmission. `CI=true` and `CDK_INSIGHTS_LICENSE_KEY` are still set explicitly.
+
 ## [1.2.0] - 2026-02-11
 
 ### Security

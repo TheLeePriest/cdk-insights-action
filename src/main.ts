@@ -76,30 +76,6 @@ async function installCdkInsights(requestedVersion: string): Promise<void> {
   core.info(`cdk-insights ${version} installed and cached`);
 }
 
-/**
- * Allowlist of environment variables passed to the CLI subprocess.
- * Only variables needed for correct operation are forwarded.
- */
-const ENV_ALLOWLIST = [
-  'PATH',
-  'HOME',
-  'RUNNER_TEMP',
-  'NODE_PATH',
-  // GitHub Actions context needed by gh CLI (PR comments) and CI detection
-  'GITHUB_ACTIONS',
-  'GITHUB_TOKEN',
-  'GITHUB_REPOSITORY',
-  'GITHUB_REF',
-  'GITHUB_SHA',
-  'GITHUB_WORKSPACE',
-  'GITHUB_EVENT_PATH',
-  'GITHUB_EVENT_NAME',
-  'GITHUB_HEAD_REF',
-  'GITHUB_BASE_REF',
-  'GITHUB_API_URL',
-  'GITHUB_STEP_SUMMARY',
-];
-
 async function runAnalysis(
   args: string[],
   workingDirectory: string,
@@ -108,15 +84,36 @@ async function runAnalysis(
   let stdout = '';
   let stderr = '';
 
-  const env: Record<string, string> = { CI: 'true' };
-
-  // Only forward allowlisted env vars to the subprocess
-  for (const key of ENV_ALLOWLIST) {
-    const value = process.env[key];
+  // Forward the full workflow environment to the CLI subprocess.
+  //
+  // Earlier revisions of this action maintained an ENV_ALLOWLIST of
+  // variables to forward (PATH, HOME, GITHUB_*, etc.). The intent was
+  // defence-in-depth: stop accidental leakage of workflow secrets into
+  // the CLI. In practice the allowlist blocked every env var a CDK
+  // app reads at synth time — AWS_REGION / AWS_ACCESS_KEY_ID /
+  // AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN for SDK calls,
+  // CDK_DEFAULT_ACCOUNT / CDK_DEFAULT_REGION for bootstrap targeting,
+  // and project-specific config vars like STAGE, STRIPE_EVENT_SOURCE_NAME,
+  // TARGET_EVENT_BUS_NAME. That broke every non-trivial CDK app: the
+  // CLI would run `cdk synth`, which would throw a Zod / dotenv /
+  // ParameterNotFound error because the required var was absent from
+  // the subprocess environment.
+  //
+  // The allowlist's threat model was also weak. Secrets reach the
+  // workflow env because the user put them there; the CLI uses them
+  // for local synthesis + sends findings to CDK Insights servers,
+  // never leaking env contents. Defensive filtering belongs one layer
+  // down, in the sensitive-data scanner that redacts CloudFormation
+  // template contents before sending to the backend.
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
     if (value !== undefined) {
       env[key] = value;
     }
   }
+  // Keep CI=true on top — GitHub sets it, but belt and braces for
+  // projects that rely on the CLI auto-detecting a CI environment.
+  env.CI = 'true';
 
   // Set license key if provided (controls AI analysis in the CLI)
   if (licenseKey) {
