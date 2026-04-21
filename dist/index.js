@@ -33727,7 +33727,7 @@ exports.colors = [6, 2, 3, 4, 5, 1];
 try {
 	// Optional dependency (as in, doesn't need to be installed, NOT like optionalDependencies in package.json)
 	// eslint-disable-next-line import/no-extraneous-dependencies
-	const supportsColor = __nccwpck_require__(60075);
+	const supportsColor = __nccwpck_require__(82438);
 
 	if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
 		exports.colors = [
@@ -84024,6 +84024,165 @@ ZipStream.prototype.finalize = function() {
 
 /***/ }),
 
+/***/ 92745:
+/***/ ((module) => {
+
+"use strict";
+
+
+module.exports = (flag, argv = process.argv) => {
+	const prefix = flag.startsWith('-') ? '' : (flag.length === 1 ? '-' : '--');
+	const position = argv.indexOf(prefix + flag);
+	const terminatorPosition = argv.indexOf('--');
+	return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
+};
+
+
+/***/ }),
+
+/***/ 82438:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+"use strict";
+
+const os = __nccwpck_require__(70857);
+const tty = __nccwpck_require__(52018);
+const hasFlag = __nccwpck_require__(92745);
+
+const {env} = process;
+
+let forceColor;
+if (hasFlag('no-color') ||
+	hasFlag('no-colors') ||
+	hasFlag('color=false') ||
+	hasFlag('color=never')) {
+	forceColor = 0;
+} else if (hasFlag('color') ||
+	hasFlag('colors') ||
+	hasFlag('color=true') ||
+	hasFlag('color=always')) {
+	forceColor = 1;
+}
+
+if ('FORCE_COLOR' in env) {
+	if (env.FORCE_COLOR === 'true') {
+		forceColor = 1;
+	} else if (env.FORCE_COLOR === 'false') {
+		forceColor = 0;
+	} else {
+		forceColor = env.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env.FORCE_COLOR, 10), 3);
+	}
+}
+
+function translateLevel(level) {
+	if (level === 0) {
+		return false;
+	}
+
+	return {
+		level,
+		hasBasic: true,
+		has256: level >= 2,
+		has16m: level >= 3
+	};
+}
+
+function supportsColor(haveStream, streamIsTTY) {
+	if (forceColor === 0) {
+		return 0;
+	}
+
+	if (hasFlag('color=16m') ||
+		hasFlag('color=full') ||
+		hasFlag('color=truecolor')) {
+		return 3;
+	}
+
+	if (hasFlag('color=256')) {
+		return 2;
+	}
+
+	if (haveStream && !streamIsTTY && forceColor === undefined) {
+		return 0;
+	}
+
+	const min = forceColor || 0;
+
+	if (env.TERM === 'dumb') {
+		return min;
+	}
+
+	if (process.platform === 'win32') {
+		// Windows 10 build 10586 is the first Windows release that supports 256 colors.
+		// Windows 10 build 14931 is the first release that supports 16m/TrueColor.
+		const osRelease = os.release().split('.');
+		if (
+			Number(osRelease[0]) >= 10 &&
+			Number(osRelease[2]) >= 10586
+		) {
+			return Number(osRelease[2]) >= 14931 ? 3 : 2;
+		}
+
+		return 1;
+	}
+
+	if ('CI' in env) {
+		if (['TRAVIS', 'CIRCLECI', 'APPVEYOR', 'GITLAB_CI', 'GITHUB_ACTIONS', 'BUILDKITE'].some(sign => sign in env) || env.CI_NAME === 'codeship') {
+			return 1;
+		}
+
+		return min;
+	}
+
+	if ('TEAMCITY_VERSION' in env) {
+		return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env.TEAMCITY_VERSION) ? 1 : 0;
+	}
+
+	if (env.COLORTERM === 'truecolor') {
+		return 3;
+	}
+
+	if ('TERM_PROGRAM' in env) {
+		const version = parseInt((env.TERM_PROGRAM_VERSION || '').split('.')[0], 10);
+
+		switch (env.TERM_PROGRAM) {
+			case 'iTerm.app':
+				return version >= 3 ? 3 : 2;
+			case 'Apple_Terminal':
+				return 2;
+			// No default
+		}
+	}
+
+	if (/-256(color)?$/i.test(env.TERM)) {
+		return 2;
+	}
+
+	if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env.TERM)) {
+		return 1;
+	}
+
+	if ('COLORTERM' in env) {
+		return 1;
+	}
+
+	return min;
+}
+
+function getSupportLevel(stream) {
+	const level = supportsColor(stream, stream && stream.isTTY);
+	return translateLevel(level);
+}
+
+module.exports = {
+	supportsColor: getSupportLevel,
+	stdout: translateLevel(supportsColor(true, tty.isatty(1))),
+	stderr: translateLevel(supportsColor(true, tty.isatty(2)))
+};
+
+
+/***/ }),
+
 /***/ 84970:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -84269,6 +84428,31 @@ function parseInputs() {
     const failOn = failOnInput
         ? failOnInput.split(',').map(s => s.trim().toLowerCase())
         : [];
+    const failOnPillarsInput = (core.getInput('fail-on-pillars') || 'security').trim().toLowerCase();
+    const knownPillars = [
+        'security',
+        'reliability',
+        'cost optimization',
+        'operational excellence',
+        'performance efficiency',
+        'sustainability',
+    ];
+    const parseFailOnPillars = (raw) => {
+        if (raw === 'all')
+            return 'all';
+        const entries = raw.split(',').map((s) => s.trim()).filter(Boolean);
+        const out = [];
+        for (const entry of entries) {
+            if (knownPillars.includes(entry)) {
+                out.push(entry);
+            }
+            else {
+                core.warning(`Unknown fail-on-pillars value "${entry}" — valid values: ${knownPillars.join(', ')}, or "all".`);
+            }
+        }
+        return out.length > 0 ? out : ['security'];
+    };
+    const failOnPillars = parseFailOnPillars(failOnPillarsInput);
     const servicesInput = core.getInput('services');
     const services = servicesInput
         ? servicesInput.split(',').map(s => s.trim()).filter(s => s.length > 0)
@@ -84312,6 +84496,7 @@ function parseInputs() {
         core.info(`  Artifact Name: ${artifactName}`);
     }
     core.info(`  Fail On: ${failOn.length > 0 ? failOn.join(', ') : '(none)'}`);
+    core.info(`  Fail On Pillars: ${failOnPillars === 'all' ? 'all' : failOnPillars.join(', ')}`);
     if (services.length > 0) {
         core.info(`  Services: ${services.join(', ')}`);
     }
@@ -84325,6 +84510,7 @@ function parseInputs() {
         stackName,
         aiAnalysis,
         failOn,
+        failOnPillars,
         prComment,
         sarifUpload,
         uploadArtifact,
@@ -84542,9 +84728,12 @@ async function run() {
         else {
             core.info(`Found ${jsonFiles.length} report file(s): ${jsonFiles.join(', ')}`);
         }
-        // Parse and aggregate results from all report files
+        // Parse and aggregate results from all report files. Counts split
+        // into totals (for display) and gating (for fail-on) so Reliability
+        // or Cost findings never block a deploy unless the user opts in
+        // via `fail-on-pillars`.
         core.startGroup('Processing Results');
-        const results = (0, outputs_1.aggregateResults)(jsonFiles);
+        const results = (0, outputs_1.aggregateResults)(jsonFiles, inputs.failOnPillars);
         // Generate SARIF file if requested
         let sarifFiles = [];
         if (inputs.sarifUpload) {
@@ -84579,36 +84768,45 @@ async function run() {
         }
         (0, outputs_1.setOutputs)(results, jsonFiles, inputs.failOn, sarifFiles, artifactId);
         core.endGroup();
-        // Check fail conditions
+        // Check fail conditions. The counts used here are already
+        // pillar-scoped (see aggregateResults) so e.g. a Reliability
+        // CRITICAL never triggers a failure under the default
+        // fail-on-pillars: security.
+        const pillarScope = inputs.failOnPillars === 'all'
+            ? 'all pillars'
+            : inputs.failOnPillars.join(', ');
         if (inputs.failOn.length > 0) {
             const failConditions = [];
-            if (inputs.failOn.includes('critical') && results.criticalCount > 0) {
-                failConditions.push(`${results.criticalCount} critical`);
+            const gating = results.gatingCounts;
+            if (inputs.failOn.includes('critical') && gating.criticalCount > 0) {
+                failConditions.push(`${gating.criticalCount} critical`);
             }
-            if (inputs.failOn.includes('high') && results.highCount > 0) {
-                failConditions.push(`${results.highCount} high`);
+            if (inputs.failOn.includes('high') && gating.highCount > 0) {
+                failConditions.push(`${gating.highCount} high`);
             }
-            if (inputs.failOn.includes('medium') && results.mediumCount > 0) {
-                failConditions.push(`${results.mediumCount} medium`);
+            if (inputs.failOn.includes('medium') && gating.mediumCount > 0) {
+                failConditions.push(`${gating.mediumCount} medium`);
             }
-            if (inputs.failOn.includes('low') && results.lowCount > 0) {
-                failConditions.push(`${results.lowCount} low`);
+            if (inputs.failOn.includes('low') && gating.lowCount > 0) {
+                failConditions.push(`${gating.lowCount} low`);
             }
             if (failConditions.length > 0) {
-                core.setFailed(`Analysis found issues at configured severity levels: ${failConditions.join(', ')}`);
+                core.setFailed(`Analysis found issues at configured severity levels (${pillarScope}): ${failConditions.join(', ')}`);
                 return;
             }
         }
         // Success summary
+        const totals = results.totalCounts;
         core.info('');
         core.info('='.repeat(50));
         core.info('CDK Insights Analysis Complete');
         core.info('='.repeat(50));
         core.info(`Total Issues: ${results.totalIssues}`);
-        core.info(`  Critical: ${results.criticalCount}`);
-        core.info(`  High: ${results.highCount}`);
-        core.info(`  Medium: ${results.mediumCount}`);
-        core.info(`  Low: ${results.lowCount}`);
+        core.info(`  Critical: ${totals.criticalCount}`);
+        core.info(`  High: ${totals.highCount}`);
+        core.info(`  Medium: ${totals.mediumCount}`);
+        core.info(`  Low: ${totals.lowCount}`);
+        core.info(`Fail-on pillars: ${pillarScope}`);
     }
     catch (error) {
         if (error instanceof Error) {
@@ -84668,99 +84866,149 @@ exports.aggregateResults = aggregateResults;
 exports.setOutputs = setOutputs;
 const core = __importStar(__nccwpck_require__(37484));
 const fs = __importStar(__nccwpck_require__(79896));
+const emptyCounts = () => ({
+    criticalCount: 0,
+    highCount: 0,
+    mediumCount: 0,
+    lowCount: 0,
+});
+const bumpCount = (counts, severity) => {
+    switch (severity) {
+        case 'CRITICAL':
+            counts.criticalCount += 1;
+            break;
+        case 'HIGH':
+            counts.highCount += 1;
+            break;
+        case 'MEDIUM':
+            counts.mediumCount += 1;
+            break;
+        case 'LOW':
+            counts.lowCount += 1;
+            break;
+    }
+};
+const addCounts = (a, b) => ({
+    criticalCount: a.criticalCount + b.criticalCount,
+    highCount: a.highCount + b.highCount,
+    mediumCount: a.mediumCount + b.mediumCount,
+    lowCount: a.lowCount + b.lowCount,
+});
+const matchesFailOnPillar = (wafPillar, failOnPillars) => {
+    if (failOnPillars === 'all')
+        return true;
+    if (!wafPillar)
+        return false;
+    const normalised = wafPillar.toLowerCase().trim();
+    return failOnPillars.includes(normalised);
+};
 /**
- * Parse analysis results from a single JSON report file
+ * Parse a single stack report into total + gating-scoped counts.
+ *
+ * Pillar-scoped counts require per-issue visibility, so we always
+ * re-walk `recommendations[].issues[]` rather than trusting the
+ * summary totals. When a report has no recommendations array (older
+ * CLI) we fall back to the summary view but gating defaults to match
+ * totals — safest over-report. The `summary.totalIssues` value is
+ * still used for display in aggregate.
  */
-function parseResults(jsonPath) {
-    const defaultResults = {
+function parseResults(jsonPath, failOnPillars) {
+    const defaults = {
         totalIssues: 0,
-        criticalCount: 0,
-        highCount: 0,
-        mediumCount: 0,
-        lowCount: 0,
+        totalCounts: emptyCounts(),
+        gatingCounts: emptyCounts(),
         resourceCount: 0,
     };
     if (!fs.existsSync(jsonPath)) {
         core.warning(`Results file not found at ${jsonPath}`);
-        return defaultResults;
+        return defaults;
     }
     try {
         const content = fs.readFileSync(jsonPath, 'utf8');
         const report = JSON.parse(content);
-        // If summary is present, use it directly
-        if (report.summary) {
-            return {
-                totalIssues: report.summary.totalIssues || 0,
-                criticalCount: report.summary.severityCounts?.CRITICAL || 0,
-                highCount: report.summary.severityCounts?.HIGH || 0,
-                mediumCount: report.summary.severityCounts?.MEDIUM || 0,
-                lowCount: report.summary.severityCounts?.LOW || 0,
-                resourceCount: report.summary.totalResources || 0,
-            };
-        }
-        // Fallback: count from recommendations array
+        const totalCounts = emptyCounts();
+        const gatingCounts = emptyCounts();
+        let totalIssues = 0;
+        let resourceCount = 0;
         if (report.recommendations && Array.isArray(report.recommendations)) {
-            const severityCounts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
-            let totalIssues = 0;
-            const resourceCount = report.recommendations.length;
+            resourceCount = report.recommendations.length;
             for (const resource of report.recommendations) {
-                if (resource.issues) {
-                    for (const issue of resource.issues) {
-                        totalIssues++;
-                        if (issue.severity && severityCounts[issue.severity] !== undefined) {
-                            severityCounts[issue.severity]++;
-                        }
+                if (!resource.issues)
+                    continue;
+                for (const issue of resource.issues) {
+                    if (!issue.severity)
+                        continue;
+                    totalIssues += 1;
+                    bumpCount(totalCounts, issue.severity);
+                    if (matchesFailOnPillar(issue.wafPillar, failOnPillars)) {
+                        bumpCount(gatingCounts, issue.severity);
                     }
                 }
             }
             return {
                 totalIssues,
-                criticalCount: severityCounts.CRITICAL,
-                highCount: severityCounts.HIGH,
-                mediumCount: severityCounts.MEDIUM,
-                lowCount: severityCounts.LOW,
+                totalCounts,
+                gatingCounts,
                 resourceCount,
             };
         }
-        return defaultResults;
+        // Fallback: summary-only report (older CLI). Without per-issue
+        // pillar data we can't filter safely; treat all as in-scope so
+        // gating doesn't under-report.
+        if (report.summary) {
+            const summaryCounts = {
+                criticalCount: report.summary.severityCounts?.CRITICAL ?? 0,
+                highCount: report.summary.severityCounts?.HIGH ?? 0,
+                mediumCount: report.summary.severityCounts?.MEDIUM ?? 0,
+                lowCount: report.summary.severityCounts?.LOW ?? 0,
+            };
+            return {
+                totalIssues: report.summary.totalIssues ?? 0,
+                totalCounts: summaryCounts,
+                gatingCounts: summaryCounts,
+                resourceCount: report.summary.totalResources ?? 0,
+            };
+        }
+        return defaults;
     }
     catch (error) {
         core.warning(`Failed to parse results file: ${error instanceof Error ? error.message : String(error)}`);
-        return defaultResults;
+        return defaults;
     }
 }
 /**
- * Aggregate results from multiple report files (one per stack)
+ * Aggregate per-stack reports into a single result set.
  */
-function aggregateResults(jsonPaths) {
+function aggregateResults(jsonPaths, failOnPillars) {
     const combined = {
         totalIssues: 0,
-        criticalCount: 0,
-        highCount: 0,
-        mediumCount: 0,
-        lowCount: 0,
+        totalCounts: emptyCounts(),
+        gatingCounts: emptyCounts(),
         resourceCount: 0,
     };
     for (const jsonPath of jsonPaths) {
-        const result = parseResults(jsonPath);
+        const result = parseResults(jsonPath, failOnPillars);
         combined.totalIssues += result.totalIssues;
-        combined.criticalCount += result.criticalCount;
-        combined.highCount += result.highCount;
-        combined.mediumCount += result.mediumCount;
-        combined.lowCount += result.lowCount;
+        combined.totalCounts = addCounts(combined.totalCounts, result.totalCounts);
+        combined.gatingCounts = addCounts(combined.gatingCounts, result.gatingCounts);
         combined.resourceCount += result.resourceCount;
     }
     return combined;
 }
 /**
- * Set action outputs based on analysis results
+ * Set action outputs and compute the fail-on exit code.
+ *
+ * Outputs reflect the full view so badges / PR comments never hide
+ * findings, but the fail-on exit code is computed strictly from
+ * `gatingCounts` — findings whose pillar is in the user's
+ * `fail-on-pillars` allowlist (default: security only).
  */
 function setOutputs(results, jsonPaths, failOn, sarifPaths, artifactId) {
     core.setOutput('total-issues', results.totalIssues.toString());
-    core.setOutput('critical-count', results.criticalCount.toString());
-    core.setOutput('high-count', results.highCount.toString());
-    core.setOutput('medium-count', results.mediumCount.toString());
-    core.setOutput('low-count', results.lowCount.toString());
+    core.setOutput('critical-count', results.totalCounts.criticalCount.toString());
+    core.setOutput('high-count', results.totalCounts.highCount.toString());
+    core.setOutput('medium-count', results.totalCounts.mediumCount.toString());
+    core.setOutput('low-count', results.totalCounts.lowCount.toString());
     core.setOutput('json-file', jsonPaths.join(','));
     if (sarifPaths.length > 0) {
         core.setOutput('sarif-file', sarifPaths.join(','));
@@ -84768,17 +85016,22 @@ function setOutputs(results, jsonPaths, failOn, sarifPaths, artifactId) {
     if (artifactId != null) {
         core.setOutput('artifact-id', artifactId.toString());
     }
-    // Determine exit code: if fail-on is configured, only count matching severities
     let exitCode = 0;
     if (failOn.length > 0) {
-        const matchingIssues = (failOn.includes('critical') ? results.criticalCount : 0) +
-            (failOn.includes('high') ? results.highCount : 0) +
-            (failOn.includes('medium') ? results.mediumCount : 0) +
-            (failOn.includes('low') ? results.lowCount : 0);
-        exitCode = matchingIssues > 0 ? 1 : 0;
+        const matching = (failOn.includes('critical') ? results.gatingCounts.criticalCount : 0) +
+            (failOn.includes('high') ? results.gatingCounts.highCount : 0) +
+            (failOn.includes('medium') ? results.gatingCounts.mediumCount : 0) +
+            (failOn.includes('low') ? results.gatingCounts.lowCount : 0);
+        exitCode = matching > 0 ? 1 : 0;
     }
     else {
-        exitCode = results.totalIssues > 0 ? 1 : 0;
+        // No fail-on configured: any in-scope finding fails. Respects the
+        // pillar filter so a Reliability-only run never blocks by default.
+        const totalInScope = results.gatingCounts.criticalCount +
+            results.gatingCounts.highCount +
+            results.gatingCounts.mediumCount +
+            results.gatingCounts.lowCount;
+        exitCode = totalInScope > 0 ? 1 : 0;
     }
     core.setOutput('exit-code', exitCode.toString());
 }
@@ -84871,14 +85124,6 @@ async function uploadSarifToCodeScanning(sarifPaths, token) {
 /***/ ((module) => {
 
 module.exports = eval("require")("encoding");
-
-
-/***/ }),
-
-/***/ 60075:
-/***/ ((module) => {
-
-module.exports = eval("require")("supports-color");
 
 
 /***/ }),

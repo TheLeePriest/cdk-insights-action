@@ -1,17 +1,32 @@
 import * as core from '@actions/core';
 import * as fs from 'fs';
+import type { PillarKey } from './inputs';
 
-export interface AnalysisResults {
-  totalIssues: number;
+type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface SeverityCounts {
   criticalCount: number;
   highCount: number;
   mediumCount: number;
   lowCount: number;
+}
+
+export interface AnalysisResults {
+  totalIssues: number;
+  /** Counts across every issue in the report — used for user-facing output. */
+  totalCounts: SeverityCounts;
+  /**
+   * Counts restricted to the pillars in `failOnPillars`. Used for exit-code
+   * gating so a Reliability warning never blocks a deploy unless the user
+   * has explicitly opted in. Equals `totalCounts` when `failOnPillars` is
+   * `'all'`.
+   */
+  gatingCounts: SeverityCounts;
   resourceCount: number;
 }
 
 interface Issue {
-  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  severity: Severity;
   resourceId: string;
   issue: string;
   recommendation?: string;
@@ -39,94 +54,149 @@ interface JsonReport {
   recommendations?: RecommendationItem[];
 }
 
+const emptyCounts = (): SeverityCounts => ({
+  criticalCount: 0,
+  highCount: 0,
+  mediumCount: 0,
+  lowCount: 0,
+});
+
+const bumpCount = (counts: SeverityCounts, severity: Severity): void => {
+  switch (severity) {
+    case 'CRITICAL':
+      counts.criticalCount += 1;
+      break;
+    case 'HIGH':
+      counts.highCount += 1;
+      break;
+    case 'MEDIUM':
+      counts.mediumCount += 1;
+      break;
+    case 'LOW':
+      counts.lowCount += 1;
+      break;
+  }
+};
+
+const addCounts = (a: SeverityCounts, b: SeverityCounts): SeverityCounts => ({
+  criticalCount: a.criticalCount + b.criticalCount,
+  highCount: a.highCount + b.highCount,
+  mediumCount: a.mediumCount + b.mediumCount,
+  lowCount: a.lowCount + b.lowCount,
+});
+
+const matchesFailOnPillar = (
+  wafPillar: string | undefined,
+  failOnPillars: PillarKey[] | 'all',
+): boolean => {
+  if (failOnPillars === 'all') return true;
+  if (!wafPillar) return false;
+  const normalised = wafPillar.toLowerCase().trim() as PillarKey;
+  return failOnPillars.includes(normalised);
+};
+
 /**
- * Parse analysis results from a single JSON report file
+ * Parse a single stack report into total + gating-scoped counts.
+ *
+ * Pillar-scoped counts require per-issue visibility, so we always
+ * re-walk `recommendations[].issues[]` rather than trusting the
+ * summary totals. When a report has no recommendations array (older
+ * CLI) we fall back to the summary view but gating defaults to match
+ * totals — safest over-report. The `summary.totalIssues` value is
+ * still used for display in aggregate.
  */
-export function parseResults(jsonPath: string): AnalysisResults {
-  const defaultResults: AnalysisResults = {
+export function parseResults(
+  jsonPath: string,
+  failOnPillars: PillarKey[] | 'all',
+): AnalysisResults {
+  const defaults: AnalysisResults = {
     totalIssues: 0,
-    criticalCount: 0,
-    highCount: 0,
-    mediumCount: 0,
-    lowCount: 0,
+    totalCounts: emptyCounts(),
+    gatingCounts: emptyCounts(),
     resourceCount: 0,
   };
 
   if (!fs.existsSync(jsonPath)) {
     core.warning(`Results file not found at ${jsonPath}`);
-    return defaultResults;
+    return defaults;
   }
 
   try {
     const content = fs.readFileSync(jsonPath, 'utf8');
     const report: JsonReport = JSON.parse(content);
 
-    // If summary is present, use it directly
-    if (report.summary) {
-      return {
-        totalIssues: report.summary.totalIssues || 0,
-        criticalCount: report.summary.severityCounts?.CRITICAL || 0,
-        highCount: report.summary.severityCounts?.HIGH || 0,
-        mediumCount: report.summary.severityCounts?.MEDIUM || 0,
-        lowCount: report.summary.severityCounts?.LOW || 0,
-        resourceCount: report.summary.totalResources || 0,
-      };
-    }
+    const totalCounts = emptyCounts();
+    const gatingCounts = emptyCounts();
+    let totalIssues = 0;
+    let resourceCount = 0;
 
-    // Fallback: count from recommendations array
     if (report.recommendations && Array.isArray(report.recommendations)) {
-      const severityCounts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
-      let totalIssues = 0;
-      const resourceCount = report.recommendations.length;
-
+      resourceCount = report.recommendations.length;
       for (const resource of report.recommendations) {
-        if (resource.issues) {
-          for (const issue of resource.issues) {
-            totalIssues++;
-            if (issue.severity && severityCounts[issue.severity] !== undefined) {
-              severityCounts[issue.severity]++;
-            }
+        if (!resource.issues) continue;
+        for (const issue of resource.issues) {
+          if (!issue.severity) continue;
+          totalIssues += 1;
+          bumpCount(totalCounts, issue.severity);
+          if (matchesFailOnPillar(issue.wafPillar, failOnPillars)) {
+            bumpCount(gatingCounts, issue.severity);
           }
         }
       }
-
       return {
         totalIssues,
-        criticalCount: severityCounts.CRITICAL,
-        highCount: severityCounts.HIGH,
-        mediumCount: severityCounts.MEDIUM,
-        lowCount: severityCounts.LOW,
+        totalCounts,
+        gatingCounts,
         resourceCount,
       };
     }
 
-    return defaultResults;
+    // Fallback: summary-only report (older CLI). Without per-issue
+    // pillar data we can't filter safely; treat all as in-scope so
+    // gating doesn't under-report.
+    if (report.summary) {
+      const summaryCounts: SeverityCounts = {
+        criticalCount: report.summary.severityCounts?.CRITICAL ?? 0,
+        highCount: report.summary.severityCounts?.HIGH ?? 0,
+        mediumCount: report.summary.severityCounts?.MEDIUM ?? 0,
+        lowCount: report.summary.severityCounts?.LOW ?? 0,
+      };
+      return {
+        totalIssues: report.summary.totalIssues ?? 0,
+        totalCounts: summaryCounts,
+        gatingCounts: summaryCounts,
+        resourceCount: report.summary.totalResources ?? 0,
+      };
+    }
+
+    return defaults;
   } catch (error) {
-    core.warning(`Failed to parse results file: ${error instanceof Error ? error.message : String(error)}`);
-    return defaultResults;
+    core.warning(
+      `Failed to parse results file: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return defaults;
   }
 }
 
 /**
- * Aggregate results from multiple report files (one per stack)
+ * Aggregate per-stack reports into a single result set.
  */
-export function aggregateResults(jsonPaths: string[]): AnalysisResults {
+export function aggregateResults(
+  jsonPaths: string[],
+  failOnPillars: PillarKey[] | 'all',
+): AnalysisResults {
   const combined: AnalysisResults = {
     totalIssues: 0,
-    criticalCount: 0,
-    highCount: 0,
-    mediumCount: 0,
-    lowCount: 0,
+    totalCounts: emptyCounts(),
+    gatingCounts: emptyCounts(),
     resourceCount: 0,
   };
 
   for (const jsonPath of jsonPaths) {
-    const result = parseResults(jsonPath);
+    const result = parseResults(jsonPath, failOnPillars);
     combined.totalIssues += result.totalIssues;
-    combined.criticalCount += result.criticalCount;
-    combined.highCount += result.highCount;
-    combined.mediumCount += result.mediumCount;
-    combined.lowCount += result.lowCount;
+    combined.totalCounts = addCounts(combined.totalCounts, result.totalCounts);
+    combined.gatingCounts = addCounts(combined.gatingCounts, result.gatingCounts);
     combined.resourceCount += result.resourceCount;
   }
 
@@ -134,20 +204,25 @@ export function aggregateResults(jsonPaths: string[]): AnalysisResults {
 }
 
 /**
- * Set action outputs based on analysis results
+ * Set action outputs and compute the fail-on exit code.
+ *
+ * Outputs reflect the full view so badges / PR comments never hide
+ * findings, but the fail-on exit code is computed strictly from
+ * `gatingCounts` — findings whose pillar is in the user's
+ * `fail-on-pillars` allowlist (default: security only).
  */
 export function setOutputs(
   results: AnalysisResults,
   jsonPaths: string[],
   failOn: string[],
   sarifPaths: string[],
-  artifactId?: number | null
+  artifactId?: number | null,
 ): void {
   core.setOutput('total-issues', results.totalIssues.toString());
-  core.setOutput('critical-count', results.criticalCount.toString());
-  core.setOutput('high-count', results.highCount.toString());
-  core.setOutput('medium-count', results.mediumCount.toString());
-  core.setOutput('low-count', results.lowCount.toString());
+  core.setOutput('critical-count', results.totalCounts.criticalCount.toString());
+  core.setOutput('high-count', results.totalCounts.highCount.toString());
+  core.setOutput('medium-count', results.totalCounts.mediumCount.toString());
+  core.setOutput('low-count', results.totalCounts.lowCount.toString());
   core.setOutput('json-file', jsonPaths.join(','));
 
   if (sarifPaths.length > 0) {
@@ -158,17 +233,23 @@ export function setOutputs(
     core.setOutput('artifact-id', artifactId.toString());
   }
 
-  // Determine exit code: if fail-on is configured, only count matching severities
   let exitCode = 0;
   if (failOn.length > 0) {
-    const matchingIssues =
-      (failOn.includes('critical') ? results.criticalCount : 0) +
-      (failOn.includes('high') ? results.highCount : 0) +
-      (failOn.includes('medium') ? results.mediumCount : 0) +
-      (failOn.includes('low') ? results.lowCount : 0);
-    exitCode = matchingIssues > 0 ? 1 : 0;
+    const matching =
+      (failOn.includes('critical') ? results.gatingCounts.criticalCount : 0) +
+      (failOn.includes('high') ? results.gatingCounts.highCount : 0) +
+      (failOn.includes('medium') ? results.gatingCounts.mediumCount : 0) +
+      (failOn.includes('low') ? results.gatingCounts.lowCount : 0);
+    exitCode = matching > 0 ? 1 : 0;
   } else {
-    exitCode = results.totalIssues > 0 ? 1 : 0;
+    // No fail-on configured: any in-scope finding fails. Respects the
+    // pillar filter so a Reliability-only run never blocks by default.
+    const totalInScope =
+      results.gatingCounts.criticalCount +
+      results.gatingCounts.highCount +
+      results.gatingCounts.mediumCount +
+      results.gatingCounts.lowCount;
+    exitCode = totalInScope > 0 ? 1 : 0;
   }
   core.setOutput('exit-code', exitCode.toString());
 }

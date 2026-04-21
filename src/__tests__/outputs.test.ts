@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as core from '@actions/core';
-import { parseResults, aggregateResults, setOutputs, AnalysisResults } from '../outputs';
+import { parseResults, aggregateResults, setOutputs, AnalysisResults, SeverityCounts } from '../outputs';
 
 vi.mock('@actions/core');
 vi.mock('fs');
@@ -13,18 +13,30 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+const zeroCounts: SeverityCounts = {
+  criticalCount: 0,
+  highCount: 0,
+  mediumCount: 0,
+  lowCount: 0,
+};
+
+const counts = (critical: number, high: number, medium: number, low: number): SeverityCounts => ({
+  criticalCount: critical,
+  highCount: high,
+  mediumCount: medium,
+  lowCount: low,
+});
+
 describe('parseResults', () => {
   it('returns defaults when file does not exist', () => {
     mockedFs.existsSync.mockReturnValue(false);
 
-    const result = parseResults('/missing.json');
+    const result = parseResults('/missing.json', 'all');
 
     expect(result).toEqual({
       totalIssues: 0,
-      criticalCount: 0,
-      highCount: 0,
-      mediumCount: 0,
-      lowCount: 0,
+      totalCounts: zeroCounts,
+      gatingCounts: zeroCounts,
       resourceCount: 0,
     });
     expect(mockedCore.warning).toHaveBeenCalledWith(
@@ -32,7 +44,7 @@ describe('parseResults', () => {
     );
   });
 
-  it('parses summary-based JSON', () => {
+  it('falls back to summary-based JSON when recommendations are absent', () => {
     mockedFs.existsSync.mockReturnValue(true);
     mockedFs.readFileSync.mockReturnValue(
       JSON.stringify({
@@ -44,42 +56,19 @@ describe('parseResults', () => {
       })
     );
 
-    const result = parseResults('/results.json');
+    const result = parseResults('/results.json', 'all');
 
+    // Summary-only reports can't be pillar-filtered safely, so totals
+    // and gating match.
     expect(result).toEqual({
       totalIssues: 10,
-      criticalCount: 1,
-      highCount: 3,
-      mediumCount: 4,
-      lowCount: 2,
+      totalCounts: counts(1, 3, 4, 2),
+      gatingCounts: counts(1, 3, 4, 2),
       resourceCount: 20,
     });
   });
 
-  it('parses summary with missing severity counts', () => {
-    mockedFs.existsSync.mockReturnValue(true);
-    mockedFs.readFileSync.mockReturnValue(
-      JSON.stringify({
-        summary: {
-          totalIssues: 5,
-          severityCounts: { HIGH: 5 },
-        },
-      })
-    );
-
-    const result = parseResults('/results.json');
-
-    expect(result).toEqual({
-      totalIssues: 5,
-      criticalCount: 0,
-      highCount: 5,
-      mediumCount: 0,
-      lowCount: 0,
-      resourceCount: 0,
-    });
-  });
-
-  it('parses recommendations array with direct issues', () => {
+  it('walks recommendations and counts by severity', () => {
     mockedFs.existsSync.mockReturnValue(true);
     mockedFs.readFileSync.mockReturnValue(
       JSON.stringify({
@@ -87,44 +76,85 @@ describe('parseResults', () => {
           {
             resourceId: 'Bucket',
             issues: [
-              { severity: 'CRITICAL', resourceId: 'Bucket', issue: 'No encryption' },
-              { severity: 'HIGH', resourceId: 'Bucket', issue: 'Public access' },
+              { severity: 'CRITICAL', resourceId: 'Bucket', issue: 'No encryption', wafPillar: 'Security' },
+              { severity: 'HIGH', resourceId: 'Bucket', issue: 'Public access', wafPillar: 'Security' },
             ],
           },
           {
             resourceId: 'Lambda',
             issues: [
-              { severity: 'LOW', resourceId: 'Lambda', issue: 'No DLQ' },
+              { severity: 'LOW', resourceId: 'Lambda', issue: 'No DLQ', wafPillar: 'Reliability' },
             ],
           },
         ],
       })
     );
 
-    const result = parseResults('/results.json');
+    const result = parseResults('/results.json', 'all');
 
     expect(result).toEqual({
       totalIssues: 3,
-      criticalCount: 1,
-      highCount: 1,
-      mediumCount: 0,
-      lowCount: 1,
+      totalCounts: counts(1, 1, 0, 1),
+      gatingCounts: counts(1, 1, 0, 1),
       resourceCount: 2,
     });
+  });
+
+  it('scopes gating counts to fail-on-pillars (security-only by default)', () => {
+    mockedFs.existsSync.mockReturnValue(true);
+    mockedFs.readFileSync.mockReturnValue(
+      JSON.stringify({
+        recommendations: [
+          {
+            resourceId: 'Bucket',
+            issues: [
+              { severity: 'CRITICAL', resourceId: 'Bucket', issue: 'Secret', wafPillar: 'Security' },
+              { severity: 'HIGH', resourceId: 'Bucket', issue: 'DLQ shared', wafPillar: 'Reliability' },
+              { severity: 'HIGH', resourceId: 'Bucket', issue: 'Over-provisioned', wafPillar: 'Cost Optimization' },
+            ],
+          },
+        ],
+      })
+    );
+
+    const result = parseResults('/results.json', ['security']);
+
+    expect(result.totalIssues).toBe(3);
+    expect(result.totalCounts).toEqual(counts(1, 2, 0, 0));
+    // Reliability + Cost filtered out of gating counts
+    expect(result.gatingCounts).toEqual(counts(1, 0, 0, 0));
+  });
+
+  it('includes every pillar when fail-on-pillars is "all"', () => {
+    mockedFs.existsSync.mockReturnValue(true);
+    mockedFs.readFileSync.mockReturnValue(
+      JSON.stringify({
+        recommendations: [
+          {
+            resourceId: 'X',
+            issues: [
+              { severity: 'HIGH', resourceId: 'X', issue: 'a', wafPillar: 'Reliability' },
+              { severity: 'MEDIUM', resourceId: 'X', issue: 'b', wafPillar: 'Cost Optimization' },
+            ],
+          },
+        ],
+      })
+    );
+
+    const result = parseResults('/results.json', 'all');
+    expect(result.gatingCounts).toEqual(counts(0, 1, 1, 0));
   });
 
   it('returns defaults for invalid JSON', () => {
     mockedFs.existsSync.mockReturnValue(true);
     mockedFs.readFileSync.mockReturnValue('not json');
 
-    const result = parseResults('/bad.json');
+    const result = parseResults('/bad.json', 'all');
 
     expect(result).toEqual({
       totalIssues: 0,
-      criticalCount: 0,
-      highCount: 0,
-      mediumCount: 0,
-      lowCount: 0,
+      totalCounts: zeroCounts,
+      gatingCounts: zeroCounts,
       resourceCount: 0,
     });
     expect(mockedCore.warning).toHaveBeenCalledWith(
@@ -136,14 +166,12 @@ describe('parseResults', () => {
     mockedFs.existsSync.mockReturnValue(true);
     mockedFs.readFileSync.mockReturnValue(JSON.stringify({}));
 
-    const result = parseResults('/empty.json');
+    const result = parseResults('/empty.json', 'all');
 
     expect(result).toEqual({
       totalIssues: 0,
-      criticalCount: 0,
-      highCount: 0,
-      mediumCount: 0,
-      lowCount: 0,
+      totalCounts: zeroCounts,
+      gatingCounts: zeroCounts,
       resourceCount: 0,
     });
   });
@@ -151,14 +179,12 @@ describe('parseResults', () => {
 
 describe('aggregateResults', () => {
   it('returns zeros for empty file list', () => {
-    const result = aggregateResults([]);
+    const result = aggregateResults([], 'all');
 
     expect(result).toEqual({
       totalIssues: 0,
-      criticalCount: 0,
-      highCount: 0,
-      mediumCount: 0,
-      lowCount: 0,
+      totalCounts: zeroCounts,
+      gatingCounts: zeroCounts,
       resourceCount: 0,
     });
   });
@@ -166,7 +192,7 @@ describe('aggregateResults', () => {
   it('aggregates results from multiple files', () => {
     mockedFs.existsSync.mockReturnValue(true);
 
-    // First file
+    // First file (summary-only)
     mockedFs.readFileSync.mockReturnValueOnce(
       JSON.stringify({
         summary: {
@@ -177,7 +203,7 @@ describe('aggregateResults', () => {
       })
     );
 
-    // Second file
+    // Second file (summary-only)
     mockedFs.readFileSync.mockReturnValueOnce(
       JSON.stringify({
         summary: {
@@ -188,26 +214,20 @@ describe('aggregateResults', () => {
       })
     );
 
-    const result = aggregateResults(['/stack1.json', '/stack2.json']);
+    const result = aggregateResults(['/stack1.json', '/stack2.json'], 'all');
 
-    expect(result).toEqual({
-      totalIssues: 8,
-      criticalCount: 1,
-      highCount: 3,
-      mediumCount: 3,
-      lowCount: 1,
-      resourceCount: 15,
-    });
+    expect(result.totalIssues).toBe(8);
+    expect(result.totalCounts).toEqual(counts(1, 3, 3, 1));
+    expect(result.gatingCounts).toEqual(counts(1, 3, 3, 1));
+    expect(result.resourceCount).toBe(15);
   });
 });
 
 describe('setOutputs', () => {
   const baseResults: AnalysisResults = {
     totalIssues: 10,
-    criticalCount: 1,
-    highCount: 3,
-    mediumCount: 4,
-    lowCount: 2,
+    totalCounts: counts(1, 3, 4, 2),
+    gatingCounts: counts(1, 3, 4, 2),
     resourceCount: 20,
   };
 
@@ -243,40 +263,58 @@ describe('setOutputs', () => {
     expect(sarifCall).toBeUndefined();
   });
 
-  it('sets exit-code 1 when issues exist and no fail-on', () => {
+  it('sets exit-code 1 when gating issues exist and no fail-on', () => {
     setOutputs(baseResults, ['/results.json'], [], [], null);
 
     expect(mockedCore.setOutput).toHaveBeenCalledWith('exit-code', '1');
   });
 
-  it('sets exit-code 0 when no issues', () => {
-    const noIssues: AnalysisResults = {
-      totalIssues: 0, criticalCount: 0, highCount: 0,
-      mediumCount: 0, lowCount: 0, resourceCount: 5,
+  it('sets exit-code 0 when no gating issues', () => {
+    const noGating: AnalysisResults = {
+      totalIssues: 3,
+      totalCounts: counts(0, 3, 0, 0),
+      gatingCounts: zeroCounts,
+      resourceCount: 5,
     };
-    setOutputs(noIssues, ['/results.json'], [], [], null);
+    setOutputs(noGating, ['/results.json'], [], [], null);
 
     expect(mockedCore.setOutput).toHaveBeenCalledWith('exit-code', '0');
   });
 
-  it('respects fail-on: exit-code 0 when issues exist but not at configured severity', () => {
-    const lowOnly: AnalysisResults = {
-      totalIssues: 3, criticalCount: 0, highCount: 0,
-      mediumCount: 0, lowCount: 3, resourceCount: 2,
+  it('respects fail-on: exit-code 0 when gating issues exist but not at configured severity', () => {
+    const lowGatingOnly: AnalysisResults = {
+      totalIssues: 3,
+      totalCounts: counts(0, 0, 0, 3),
+      gatingCounts: counts(0, 0, 0, 3),
+      resourceCount: 2,
     };
-    setOutputs(lowOnly, ['/results.json'], ['critical', 'high'], [], null);
+    setOutputs(lowGatingOnly, ['/results.json'], ['critical', 'high'], [], null);
 
     expect(mockedCore.setOutput).toHaveBeenCalledWith('exit-code', '0');
   });
 
-  it('respects fail-on: exit-code 1 when issues exist at configured severity', () => {
+  it('respects fail-on: exit-code 1 when gating issues at configured severity', () => {
     const withCritical: AnalysisResults = {
-      totalIssues: 5, criticalCount: 2, highCount: 0,
-      mediumCount: 0, lowCount: 3, resourceCount: 3,
+      totalIssues: 5,
+      totalCounts: counts(2, 0, 0, 3),
+      gatingCounts: counts(2, 0, 0, 3),
+      resourceCount: 3,
     };
     setOutputs(withCritical, ['/results.json'], ['critical'], [], null);
 
     expect(mockedCore.setOutput).toHaveBeenCalledWith('exit-code', '1');
+  });
+
+  it('does not fail when a Reliability CRITICAL is filtered out of gating', () => {
+    const reliabilityCriticalOnly: AnalysisResults = {
+      totalIssues: 1,
+      totalCounts: counts(1, 0, 0, 0),
+      gatingCounts: zeroCounts,
+      resourceCount: 1,
+    };
+    setOutputs(reliabilityCriticalOnly, ['/results.json'], ['critical'], [], null);
+
+    expect(mockedCore.setOutput).toHaveBeenCalledWith('exit-code', '0');
   });
 
   it('sets artifact-id output when provided', () => {

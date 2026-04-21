@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-04-21
+
+### Added
+
+- `fail-on-pillars` input to scope the fail-on gate by AWS Well-Architected pillar. Defaults to `security`, so Reliability, Cost, Operational Excellence, Performance Efficiency, and Sustainability findings are surfaced in the report but no longer block the deploy. Accepts a comma-separated list of pillar names, or the shorthand `all`. Matches how other scanners (Snyk, SonarQube, Trivy) separate "found something" from "fail the build". No workflow change is required for existing consumers — the default behaviour is the correct default for most projects.
+
+### Changed
+
+- `AnalysisResults` now carries both `totalCounts` (for display and outputs) and `gatingCounts` (for exit-code gating). The `critical-count`/`high-count`/`medium-count`/`low-count` outputs still reflect full totals so PR comments and badges never hide findings, while the exit code honours `fail-on-pillars`.
+- Per-stack reports are now always walked via `recommendations[].issues[]` rather than the summary block, so the pillar filter is applied accurately. Summary-only reports from older CLI versions fall back to unfiltered gating to avoid under-reporting.
+
 ## [1.3.1] - 2026-04-21
 
 ### Fixed

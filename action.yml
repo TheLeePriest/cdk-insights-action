@@ -31,6 +31,17 @@ inputs:
     required: false
     default: ''
 
+  fail-on-pillars:
+    description: >-
+      Which WAF pillars count toward fail-on. Reliability, Cost, and
+      Best-Practice findings are reported but do not block the deploy
+      unless included here. Accepts a comma-separated list of
+      "security", "reliability", "cost optimization",
+      "operational excellence", "performance efficiency",
+      "sustainability", or the shorthand "all". Default: security.
+    required: false
+    default: 'security'
+
   pr-comment:
     description: 'Post analysis summary as PR comment'
     required: false

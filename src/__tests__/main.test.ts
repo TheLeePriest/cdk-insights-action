@@ -9,6 +9,7 @@ function defaultInputs(overrides: Partial<ActionInputs> = {}): ActionInputs {
     stackName: '',
     aiAnalysis: false,
     failOn: [],
+    failOnPillars: ['security'],
     prComment: true,
     sarifUpload: false,
     uploadArtifact: true,

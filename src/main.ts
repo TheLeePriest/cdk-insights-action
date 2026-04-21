@@ -195,9 +195,12 @@ async function run(): Promise<void> {
       core.info(`Found ${jsonFiles.length} report file(s): ${jsonFiles.join(', ')}`);
     }
 
-    // Parse and aggregate results from all report files
+    // Parse and aggregate results from all report files. Counts split
+    // into totals (for display) and gating (for fail-on) so Reliability
+    // or Cost findings never block a deploy unless the user opts in
+    // via `fail-on-pillars`.
     core.startGroup('Processing Results');
-    const results = aggregateResults(jsonFiles);
+    const results = aggregateResults(jsonFiles, inputs.failOnPillars);
 
     // Generate SARIF file if requested
     let sarifFiles: string[] = [];
@@ -237,41 +240,51 @@ async function run(): Promise<void> {
     setOutputs(results, jsonFiles, inputs.failOn, sarifFiles, artifactId);
     core.endGroup();
 
-    // Check fail conditions
+    // Check fail conditions. The counts used here are already
+    // pillar-scoped (see aggregateResults) so e.g. a Reliability
+    // CRITICAL never triggers a failure under the default
+    // fail-on-pillars: security.
+    const pillarScope = inputs.failOnPillars === 'all'
+      ? 'all pillars'
+      : inputs.failOnPillars.join(', ');
+
     if (inputs.failOn.length > 0) {
       const failConditions: string[] = [];
+      const gating = results.gatingCounts;
 
-      if (inputs.failOn.includes('critical') && results.criticalCount > 0) {
-        failConditions.push(`${results.criticalCount} critical`);
+      if (inputs.failOn.includes('critical') && gating.criticalCount > 0) {
+        failConditions.push(`${gating.criticalCount} critical`);
       }
-      if (inputs.failOn.includes('high') && results.highCount > 0) {
-        failConditions.push(`${results.highCount} high`);
+      if (inputs.failOn.includes('high') && gating.highCount > 0) {
+        failConditions.push(`${gating.highCount} high`);
       }
-      if (inputs.failOn.includes('medium') && results.mediumCount > 0) {
-        failConditions.push(`${results.mediumCount} medium`);
+      if (inputs.failOn.includes('medium') && gating.mediumCount > 0) {
+        failConditions.push(`${gating.mediumCount} medium`);
       }
-      if (inputs.failOn.includes('low') && results.lowCount > 0) {
-        failConditions.push(`${results.lowCount} low`);
+      if (inputs.failOn.includes('low') && gating.lowCount > 0) {
+        failConditions.push(`${gating.lowCount} low`);
       }
 
       if (failConditions.length > 0) {
         core.setFailed(
-          `Analysis found issues at configured severity levels: ${failConditions.join(', ')}`
+          `Analysis found issues at configured severity levels (${pillarScope}): ${failConditions.join(', ')}`,
         );
         return;
       }
     }
 
     // Success summary
+    const totals = results.totalCounts;
     core.info('');
     core.info('='.repeat(50));
     core.info('CDK Insights Analysis Complete');
     core.info('='.repeat(50));
     core.info(`Total Issues: ${results.totalIssues}`);
-    core.info(`  Critical: ${results.criticalCount}`);
-    core.info(`  High: ${results.highCount}`);
-    core.info(`  Medium: ${results.mediumCount}`);
-    core.info(`  Low: ${results.lowCount}`);
+    core.info(`  Critical: ${totals.criticalCount}`);
+    core.info(`  High: ${totals.highCount}`);
+    core.info(`  Medium: ${totals.mediumCount}`);
+    core.info(`  Low: ${totals.lowCount}`);
+    core.info(`Fail-on pillars: ${pillarScope}`);
 
   } catch (error) {
     if (error instanceof Error) {

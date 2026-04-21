@@ -1,12 +1,35 @@
 import * as core from '@actions/core';
 import * as path from 'path';
 
+/**
+ * Supported WAF pillars as emitted by the CLI on each finding.
+ * Matches the CLI's `WAFPillars` type, lower-cased for ergonomic
+ * action-side configuration.
+ */
+export type PillarKey =
+  | 'security'
+  | 'reliability'
+  | 'cost optimization'
+  | 'operational excellence'
+  | 'performance efficiency'
+  | 'sustainability';
+
 export interface ActionInputs {
   licenseKey: string;
   workingDirectory: string;
   stackName: string;
   aiAnalysis: boolean;
   failOn: string[];
+  /**
+   * Which WAF pillars count toward the fail-on thresholds. Reliability,
+   * Cost, and Best-Practice findings are surfaced in the report but
+   * don't block the deploy unless the user opts in. Default is
+   * `['security']` — matches how other scanners (Snyk, SonarQube,
+   * Trivy) separate "found something" from "fail the build".
+   *
+   * Accepts `'all'` as a shorthand for every pillar.
+   */
+  failOnPillars: PillarKey[] | 'all';
   prComment: boolean;
   sarifUpload: boolean;
   uploadArtifact: boolean;
@@ -81,6 +104,32 @@ export function parseInputs(): ActionInputs {
     ? failOnInput.split(',').map(s => s.trim().toLowerCase())
     : [];
 
+  const failOnPillarsInput = (core.getInput('fail-on-pillars') || 'security').trim().toLowerCase();
+  const knownPillars: PillarKey[] = [
+    'security',
+    'reliability',
+    'cost optimization',
+    'operational excellence',
+    'performance efficiency',
+    'sustainability',
+  ];
+  const parseFailOnPillars = (raw: string): PillarKey[] | 'all' => {
+    if (raw === 'all') return 'all';
+    const entries = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    const out: PillarKey[] = [];
+    for (const entry of entries) {
+      if ((knownPillars as string[]).includes(entry)) {
+        out.push(entry as PillarKey);
+      } else {
+        core.warning(
+          `Unknown fail-on-pillars value "${entry}" — valid values: ${knownPillars.join(', ')}, or "all".`,
+        );
+      }
+    }
+    return out.length > 0 ? out : ['security'];
+  };
+  const failOnPillars = parseFailOnPillars(failOnPillarsInput);
+
   const servicesInput = core.getInput('services');
   const services = servicesInput
     ? servicesInput.split(',').map(s => s.trim()).filter(s => s.length > 0)
@@ -133,6 +182,7 @@ export function parseInputs(): ActionInputs {
     core.info(`  Artifact Name: ${artifactName}`);
   }
   core.info(`  Fail On: ${failOn.length > 0 ? failOn.join(', ') : '(none)'}`);
+  core.info(`  Fail On Pillars: ${failOnPillars === 'all' ? 'all' : failOnPillars.join(', ')}`);
   if (services.length > 0) {
     core.info(`  Services: ${services.join(', ')}`);
   }
@@ -147,6 +197,7 @@ export function parseInputs(): ActionInputs {
     stackName,
     aiAnalysis,
     failOn,
+    failOnPillars,
     prComment,
     sarifUpload,
     uploadArtifact,
