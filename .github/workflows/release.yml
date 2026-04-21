@@ -34,47 +34,63 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Get version
+      - name: Resolve version
         id: version
-        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        env:
+          DISPATCH_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            VERSION="$DISPATCH_TAG"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          if ! echo "$VERSION" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
+            echo "::error::Invalid version tag: $VERSION"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Create Release
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
-        with:
-          name: ${{ steps.version.outputs.version }}
-          body: |
-            ## CDK Insights Action ${{ steps.version.outputs.version }}
-
-            See [CHANGELOG.md](https://github.com/instancelabs/cdk-insights-action/blob/main/CHANGELOG.md) for details.
-
-            ### Usage
-
-            ```yaml
-            - uses: instancelabs/cdk-insights-action@${{ steps.version.outputs.version }}
-              with:
-                license-key: ${{ secrets.CDK_INSIGHTS_LICENSE_KEY }}
-                ai-analysis: true
-            ```
-          draft: false
-          prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          NOTES=$(cat <<EOF
+          ## CDK Insights Action $VERSION
+
+          See [CHANGELOG.md](https://github.com/instancelabs/cdk-insights-action/blob/main/CHANGELOG.md) for details.
+
+          ### Usage
+
+          \`\`\`yaml
+          - uses: instancelabs/cdk-insights-action@$VERSION
+            with:
+              license-key: \${{ secrets.CDK_INSIGHTS_LICENSE_KEY }}
+              ai-analysis: true
+          \`\`\`
+          EOF
+          )
+          if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$VERSION" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$VERSION" \
+              --notes "$NOTES" \
+              --draft=false --prerelease=false
+          else
+            gh release create "$VERSION" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$VERSION" \
+              --notes "$NOTES"
+          fi
 
       - name: Update major version tag
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          # Validate version looks like a semver tag (e.g. v1.2.3)
-          if ! echo "$VERSION" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
-            echo "::error::Invalid version tag: $VERSION"
-            exit 1
-          fi
-
           MAJOR=$(echo "$VERSION" | cut -d. -f1)
 
           git config user.name github-actions
           git config user.email github-actions@github.com
 
-          # Update or create the major version tag (e.g., v1)
           git tag -fa "$MAJOR" -m "Update $MAJOR tag to $VERSION"
           git push origin "$MAJOR" --force
