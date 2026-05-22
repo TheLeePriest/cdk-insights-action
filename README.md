@@ -1,16 +1,16 @@
 # CDK Insights GitHub Action
 
-Analyze your AWS CDK infrastructure for security vulnerabilities, cost optimization opportunities, and best practice violations - directly in your CI/CD pipeline.
+Static and AI-powered analysis for AWS CDK — runs `cdk-insights scan` against your synthesized stacks and surfaces findings as PR comments, GitHub Code Scanning alerts, and downloadable reports.
 
 ## Features
 
-- **Security scanning** - Detect misconfigurations and vulnerabilities before deployment
-- **Cost optimization** - Find opportunities to reduce AWS spend
-- **Best practices** - Ensure CDK patterns follow AWS Well-Architected Framework
-- **AI-powered analysis** - Get intelligent recommendations (Pro/Team license)
-- **PR comments** - Automatic summary posted on pull requests
-- **Code scanning** - Auto-upload SARIF to GitHub Security tab
-- **Report artifacts** - JSON, SARIF, and markdown reports persisted as downloadable artifacts
+- **100+ rules across 35+ AWS services** — security misconfigurations, cost waste, reliability gaps, and Well-Architected Framework pillar violations
+- **AI-powered recommendations** — context-aware analysis via AWS Bedrock (requires a CDK Insights account; 500 free credits/month or paid tier)
+- **PR comments** — severity-bucketed summary posted on pull requests via `gh` CLI
+- **GitHub Code Scanning** — SARIF generated and auto-uploaded to the Security tab
+- **Report artifacts** — JSON, SARIF, and markdown reports persisted as downloadable workflow artifacts
+- **Per-pillar fail gating** — fail the build on Security findings only (default), or opt into Reliability / Cost / etc.
+- **CLI caching** — the `cdk-insights` npm package is cached via `@actions/tool-cache`, so subsequent runs skip the install step
 
 ## Quick Start
 
@@ -47,39 +47,42 @@ jobs:
 
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
-| `license-key` | CDK Insights license key (required for AI analysis) | No | - |
-| `working-directory` | Directory containing CDK project | No | `.` |
-| `stack-name` | Specific stack to analyze (analyzes all by default) | No | (all stacks) |
-| `ai-analysis` | Enable AI-powered recommendations (requires `license-key`). Set to `false` with a license key to force static-only analysis. | No | `false` |
-| `fail-on` | Fail workflow on severity levels (comma-separated: `critical,high,medium,low`) | No | - |
-| `pr-comment` | Post analysis summary as PR comment | No | `true` |
-| `sarif-upload` | Generate SARIF file and auto-upload to GitHub Code Scanning | No | `false` |
-| `upload-artifact` | Upload report files (JSON, SARIF, markdown) as a GitHub artifact | No | `true` |
-| `artifact-name` | Name for the uploaded artifact | No | `cdk-insights-report` |
-| `github-token` | GitHub token for SARIF upload to Code Scanning | No | `${{ github.token }}` |
-| `services` | Filter analysis to specific AWS services (comma-separated) | No | (all services) |
-| `rule-filter` | Filter to specific rules (comma-separated rule IDs) | No | - |
-| `cdk-insights-version` | Specific version of cdk-insights to use | No | `latest` |
+| `license-key` | CDK Insights license key. Required for AI analysis. Free, Pro, and Team license keys are all supported — quotas are enforced server-side. | No | - |
+| `working-directory` | Directory containing the CDK project (validated to stay inside `GITHUB_WORKSPACE`). | No | `.` |
+| `stack-name` | Specific stack to analyze. Omit to analyze every stack (`--all`). | No | (all stacks) |
+| `ai-analysis` | Enable AI-powered recommendations. Requires `license-key`. Set to `false` with a license key to pass `--local` and force static-only analysis. | No | `false` |
+| `fail-on` | Fail workflow on severity levels (comma-separated: `critical,high,medium,low`). Omit to fail on any finding within `fail-on-pillars` scope. | No | - |
+| `fail-on-pillars` | Which Well-Architected pillars count toward `fail-on`. Comma-separated list of `security`, `reliability`, `cost optimization`, `operational excellence`, `performance efficiency`, `sustainability`, or the shorthand `all`. Findings from other pillars are still reported but won't block the deploy. | No | `security` |
+| `pr-comment` | Post analysis summary as a PR comment (uses the `gh` CLI, authenticated via the workflow's `GITHUB_TOKEN`). | No | `true` |
+| `sarif-upload` | Generate SARIF and auto-upload to GitHub Code Scanning. Requires `security-events: write`. | No | `false` |
+| `upload-artifact` | Upload JSON, SARIF, and markdown report files as a workflow artifact. | No | `true` |
+| `artifact-name` | Name for the uploaded artifact. | No | `cdk-insights-report` |
+| `github-token` | Token used for SARIF upload to Code Scanning. | No | `${{ github.token }}` |
+| `services` | Filter analysis to specific AWS services (comma-separated, e.g. `S3,Lambda,IAM`). | No | (all services) |
+| `rule-filter` | Filter to specific rules (comma-separated rule IDs). | No | - |
+| `cdk-insights-version` | npm version of `cdk-insights` to install. Use `latest` or a semver string. | No | `latest` |
 
 ## Outputs
 
 | Output | Description |
 |--------|-------------|
-| `total-issues` | Total number of issues found |
-| `critical-count` | Number of critical issues |
+| `total-issues` | Total number of issues found across every pillar |
+| `critical-count` | Number of critical issues (full totals — not pillar-filtered) |
 | `high-count` | Number of high severity issues |
 | `medium-count` | Number of medium severity issues |
 | `low-count` | Number of low severity issues |
-| `sarif-file` | Path to SARIF file(s) (if generated) |
-| `json-file` | Path to JSON results file(s) |
-| `artifact-id` | ID of the uploaded artifact (if `upload-artifact` is enabled) |
-| `exit-code` | Exit code (0 = no issues at `fail-on` severity, 1 = issues found) |
+| `sarif-file` | Comma-separated paths to generated SARIF file(s) |
+| `json-file` | Comma-separated paths to JSON results file(s) |
+| `artifact-id` | ID of the uploaded artifact (omitted if `upload-artifact: false`) |
+| `exit-code` | `1` if any finding within `fail-on-pillars` matches `fail-on`; otherwise `0` |
+
+> Severity outputs always reflect **full totals** so PR comments and downstream badges never hide findings. The fail-on gate uses pillar-filtered counts internally.
 
 ## Examples
 
-### Basic Analysis (Free Tier)
+### Static Analysis (No License)
 
-Static analysis with PR comments - no license required:
+100+ rules with PR comments — no signup required:
 
 ```yaml
 - uses: instancelabs/cdk-insights-action@v1
@@ -87,7 +90,7 @@ Static analysis with PR comments - no license required:
 
 ### AI-Powered Analysis
 
-Enable AI recommendations with a Pro or Team license:
+Enable Bedrock-backed recommendations. Works on any tier with a license key — Free accounts get 500 AI insights/month, Pro gets 5,000/month, Team gets 10,000 per seat:
 
 ```yaml
 - uses: instancelabs/cdk-insights-action@v1
@@ -98,7 +101,7 @@ Enable AI recommendations with a Pro or Team license:
 
 ### Static-Only with License Key
 
-Force static analysis even with a license key (skips AI):
+Force static analysis even when a license key is present (passes `--local` to the CLI, preserving your AI credits):
 
 ```yaml
 - uses: instancelabs/cdk-insights-action@v1
@@ -107,9 +110,9 @@ Force static analysis even with a license key (skips AI):
     ai-analysis: false
 ```
 
-### Fail on Critical/High Issues
+### Fail on Critical/High Security Issues
 
-Block merges if critical or high severity issues are found:
+By default the action only fails on **Security** pillar findings. To block merges on critical or high severity security issues:
 
 ```yaml
 - uses: instancelabs/cdk-insights-action@v1
@@ -117,6 +120,27 @@ Block merges if critical or high severity issues are found:
     license-key: ${{ secrets.CDK_INSIGHTS_LICENSE_KEY }}
     ai-analysis: true
     fail-on: critical,high
+```
+
+### Gate on Multiple Well-Architected Pillars
+
+Include Reliability and Cost findings in the fail-on gate (otherwise they're reported but non-blocking):
+
+```yaml
+- uses: instancelabs/cdk-insights-action@v1
+  with:
+    license-key: ${{ secrets.CDK_INSIGHTS_LICENSE_KEY }}
+    fail-on: critical,high
+    fail-on-pillars: security,reliability,cost optimization
+```
+
+Or fail on any pillar:
+
+```yaml
+- uses: instancelabs/cdk-insights-action@v1
+  with:
+    fail-on: critical
+    fail-on-pillars: all
 ```
 
 ### Specific Stack
@@ -219,6 +243,7 @@ jobs:
           license-key: ${{ secrets.CDK_INSIGHTS_LICENSE_KEY }}
           ai-analysis: true
           fail-on: critical,high
+          fail-on-pillars: security
           pr-comment: true
           sarif-upload: true
           upload-artifact: true
@@ -227,10 +252,10 @@ jobs:
 
 This will:
 1. Analyze all CDK stacks with AI-powered recommendations
-2. Post a detailed summary as a PR comment
+2. Post a severity-bucketed summary as a PR comment
 3. Upload SARIF results to the GitHub Security tab
 4. Persist JSON, SARIF, and markdown reports as downloadable artifacts
-5. Fail the workflow if critical or high severity issues are found
+5. Fail the workflow if any **Security** finding is critical or high (other pillars are reported but non-blocking)
 
 ### Monorepo with Multiple CDK Projects
 
@@ -285,8 +310,8 @@ The action requires different permissions depending on features used:
 
 ```yaml
 permissions:
-  contents: read        # Always required
-  pull-requests: write  # Required for PR comments
+  contents: read          # Always required
+  pull-requests: write    # Required for PR comments
   security-events: write  # Required for SARIF upload to Code Scanning
 ```
 
@@ -297,6 +322,18 @@ permissions:
 | `security-events: write` | SARIF upload to Security tab | When `sarif-upload: true` |
 
 > **Note:** Artifact upload uses the default `GITHUB_TOKEN` permissions and does not require additional permissions.
+
+## Environment Variables
+
+The full workflow environment is forwarded to the `cdk-insights` CLI subprocess, so anything a `cdk synth` needs at runtime — AWS credentials, region, project config — works out of the box:
+
+- `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` (for SDK lookups during synth)
+- `CDK_DEFAULT_ACCOUNT`, `CDK_DEFAULT_REGION` (for environment-targeted stacks)
+- Any project-specific vars your CDK app reads (e.g. `STAGE`, dotenv-loaded config)
+
+The action sets `CI=true` and `CDK_INSIGHTS_LICENSE_KEY` (when `license-key` is provided) on top of the inherited env. License keys are masked via `core.setSecret()` so they never appear in logs.
+
+If your CDK app needs AWS credentials at synth time, configure them with [`aws-actions/configure-aws-credentials`](https://github.com/aws-actions/configure-aws-credentials) before this action — ideally via OIDC, not long-lived keys.
 
 ## PR Comment Example
 
@@ -329,13 +366,16 @@ When `pr-comment: true` (default), the action posts a summary like:
 
 ## Pricing
 
-| Tier | Resources/month | AI Analysis | Price |
-|------|-----------------|-------------|-------|
-| Free | 2,500 | No | $0 |
-| Pro | 10,000 | Yes | $29/mo |
-| Team | 15,000/member | Yes | $49/member/mo |
+| Plan | Price | What's Included |
+|------|-------|-----------------|
+| **Free** (no signup) | £0 | Static analysis (100+ rules), JSON/Table/Markdown/SARIF output, multi-stack analysis |
+| **Free** (signed-up) | £0 | Everything above + 500 AI insights/month (Nova Lite) |
+| **Pro** | £9.99/mo | Everything in Free + full AI analysis (Bedrock), dashboard, PDF reports, **5,000 AI insights/month** |
+| **Team** | £12.99/seat/mo (2-seat minimum) | Everything in Pro + team management, shared configs, audit trails, **10,000 AI insights per seat** |
 
-[Get a license at cdkinsights.dev](https://cdkinsights.dev/pricing)
+Static analysis is **free forever** — no signup, no credit card. AI analysis requires a license key (free account or paid). Usage beyond the included monthly insights is billed per-credit on Pro/Team.
+
+[View full pricing at cdkinsights.dev](https://cdkinsights.dev/pricing)
 
 ## Support
 
