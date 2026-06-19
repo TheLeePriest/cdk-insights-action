@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-Two pre-existing bugs surfaced by end-to-end testing against a real multi-stack CDK app:
+Two pre-existing bugs surfaced by end-to-end testing against a real multi-stack CDK app. The action now documents a minimum supported CLI of **cdk-insights >= 1.44.1** (single-pass reports, `fail-on-class`, and `stack-name` scoping all depend on it; the action degrades gracefully on older CLIs).
 
 - **Tool-cache hits couldn't find the CLI.** On a warm `@actions/tool-cache` (subsequent runs on self-hosted runners, or any runner with a populated tool cache), the cache-hit branch added `<cached>/bin` to `PATH`, but the binary lives at `<cached>/node_modules/.bin` (where the install branch correctly points). Cached runs failed with "Unable to locate executable file: cdk-insights". GitHub-hosted runners start with a cold cache each job, which is why it went unnoticed. The cached path is now correct and the binary's presence is verified before use (reinstalls if the cache is incomplete).
 - **Specifying `stack-name` silently disabled every flag.** The `--` separator and stack name were emitted *before* the flags, so `--format`, `--reports`, `--warn-sensitive`, `--no-failOnCritical`, and `--prComment` all landed after `--` and were parsed as positional arguments rather than options — meaning no SARIF/markdown, no sensitive-data warning behaviour, etc. Stack selection is now emitted last, after all flags.
