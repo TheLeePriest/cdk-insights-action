@@ -21,14 +21,6 @@ export function buildScanArgs(
 ): string[] {
   const args: string[] = ['scan'];
 
-  // Stack name or analyze all
-  if (inputs.stackName) {
-    // Use -- to prevent stack name from being interpreted as a flag
-    args.push('--', inputs.stackName);
-  } else {
-    args.push('--all');
-  }
-
   // Skip interactive prompts in CI
   args.push('--yes');
 
@@ -73,7 +65,26 @@ export function buildScanArgs(
     args.push('--reports', ...extraReports);
   }
 
+  // Stack selection goes LAST. The `--` separator stops a flag-like stack
+  // name from being parsed as an option (defence-in-depth on top of the
+  // input validation), but everything after `--` is treated as positional —
+  // so it must come after every flag, or the flags get swallowed too.
+  appendStackSelection(args, inputs);
+
   return args;
+}
+
+/**
+ * Append stack selection to the end of an args list: `--all`, or a
+ * `--`-guarded positional stack name. Must be the final thing pushed (see
+ * {@link buildScanArgs}).
+ */
+function appendStackSelection(args: string[], inputs: ActionInputs): void {
+  if (inputs.stackName) {
+    args.push('--', inputs.stackName);
+  } else {
+    args.push('--all');
+  }
 }
 
 /**
@@ -85,12 +96,6 @@ export function buildScanArgs(
  */
 export function buildSarifArgs(inputs: ActionInputs): string[] {
   const args: string[] = ['scan'];
-
-  if (inputs.stackName) {
-    args.push('--', inputs.stackName);
-  } else {
-    args.push('--all');
-  }
 
   args.push('--yes');
   args.push('--no-failOnCritical');
@@ -104,6 +109,9 @@ export function buildSarifArgs(inputs: ActionInputs): string[] {
   }
 
   args.push('--format', 'sarif');
+
+  // Stack selection last — see buildScanArgs / appendStackSelection.
+  appendStackSelection(args, inputs);
 
   return args;
 }

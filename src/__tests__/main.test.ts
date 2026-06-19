@@ -33,7 +33,11 @@ describe('buildScanArgs', () => {
     expect(args).toContain('--no-failOnCritical');
     expect(args).toContain('--warn-sensitive');
     expect(args).toContain('--prComment');
-    expect(args.slice(-2)).toEqual(['--format', 'json']);
+    // --format json is emitted; stack selection (--all) is LAST so the
+    // flags before it aren't swallowed by the `--` separator.
+    const fmtIdx = args.indexOf('--format');
+    expect(args[fmtIdx + 1]).toBe('json');
+    expect(args[args.length - 1]).toBe('--all');
   });
 
   it('uses -- separator and stack name instead of --all when provided', () => {
@@ -44,6 +48,26 @@ describe('buildScanArgs', () => {
     const ddIdx = args.indexOf('--');
     expect(args[ddIdx + 1]).toBe('MyStack');
     expect(args).not.toContain('--all');
+  });
+
+  it('emits every flag BEFORE the -- stack-name separator (else the CLI swallows them)', () => {
+    const args = buildScanArgs(defaultInputs({ stackName: 'MyStack' }), [
+      'sarif',
+    ]);
+    const ddIdx = args.indexOf('--');
+    for (const flag of [
+      '--yes',
+      '--no-failOnCritical',
+      '--warn-sensitive',
+      '--format',
+      '--reports',
+    ]) {
+      const idx = args.indexOf(flag);
+      expect(idx).toBeGreaterThan(-1);
+      expect(idx).toBeLessThan(ddIdx);
+    }
+    // The stack name (and only it) follows the separator.
+    expect(args.slice(ddIdx)).toEqual(['--', 'MyStack']);
   });
 
   it('does not include --prComment when disabled', () => {
@@ -168,7 +192,9 @@ describe('buildSarifArgs', () => {
     expect(args).toContain('--yes');
     expect(args).toContain('--no-failOnCritical');
     expect(args).toContain('--warn-sensitive');
-    expect(args.slice(-2)).toEqual(['--format', 'sarif']);
+    const fmtIdx = args.indexOf('--format');
+    expect(args[fmtIdx + 1]).toBe('sarif');
+    expect(args[args.length - 1]).toBe('--all');
   });
 
   it('uses -- separator and stack name when provided', () => {

@@ -56,12 +56,20 @@ async function installCdkInsights(requestedVersion: string): Promise<string> {
   const version = await resolveVersion(requestedVersion);
   core.info(`Resolved cdk-insights version: ${version}`);
 
-  // Check tool cache first
+  // Check tool cache first. The cached directory is the contents of the
+  // npm --prefix install dir, so the binary lives at node_modules/.bin
+  // (matching where it's added on the install path below) — NOT bin/.
   const cachedPath = tc.find(TOOL_NAME, version);
   if (cachedPath) {
-    core.info(`Using cached cdk-insights ${version}`);
-    core.addPath(path.join(cachedPath, 'bin'));
-    return version;
+    const cachedBin = path.join(cachedPath, 'node_modules', '.bin');
+    if (fs.existsSync(path.join(cachedBin, 'cdk-insights'))) {
+      core.info(`Using cached cdk-insights ${version}`);
+      core.addPath(cachedBin);
+      return version;
+    }
+    core.warning(
+      `Cached cdk-insights ${version} is missing its binary — reinstalling.`,
+    );
   }
 
   // Not cached — install to a temp directory and cache it

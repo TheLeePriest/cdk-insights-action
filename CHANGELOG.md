@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-06-19
+
+### Fixed
+
+Two pre-existing bugs surfaced by end-to-end testing against a real multi-stack CDK app:
+
+- **Tool-cache hits couldn't find the CLI.** On a warm `@actions/tool-cache` (subsequent runs on self-hosted runners, or any runner with a populated tool cache), the cache-hit branch added `<cached>/bin` to `PATH`, but the binary lives at `<cached>/node_modules/.bin` (where the install branch correctly points). Cached runs failed with "Unable to locate executable file: cdk-insights". GitHub-hosted runners start with a cold cache each job, which is why it went unnoticed. The cached path is now correct and the binary's presence is verified before use (reinstalls if the cache is incomplete).
+- **Specifying `stack-name` silently disabled every flag.** The `--` separator and stack name were emitted *before* the flags, so `--format`, `--reports`, `--warn-sensitive`, `--no-failOnCritical`, and `--prComment` all landed after `--` and were parsed as positional arguments rather than options — meaning no SARIF/markdown, no sensitive-data warning behaviour, etc. Stack selection is now emitted last, after all flags.
+
 ## [1.5.0] - 2026-06-19
 
 ### Added
