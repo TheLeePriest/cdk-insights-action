@@ -33727,7 +33727,7 @@ exports.colors = [6, 2, 3, 4, 5, 1];
 try {
 	// Optional dependency (as in, doesn't need to be installed, NOT like optionalDependencies in package.json)
 	// eslint-disable-next-line import/no-extraneous-dependencies
-	const supportsColor = __nccwpck_require__(60075);
+	const supportsColor = __nccwpck_require__(82438);
 
 	if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
 		exports.colors = [
@@ -84024,6 +84024,165 @@ ZipStream.prototype.finalize = function() {
 
 /***/ }),
 
+/***/ 92745:
+/***/ ((module) => {
+
+"use strict";
+
+
+module.exports = (flag, argv = process.argv) => {
+	const prefix = flag.startsWith('-') ? '' : (flag.length === 1 ? '-' : '--');
+	const position = argv.indexOf(prefix + flag);
+	const terminatorPosition = argv.indexOf('--');
+	return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
+};
+
+
+/***/ }),
+
+/***/ 82438:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+"use strict";
+
+const os = __nccwpck_require__(70857);
+const tty = __nccwpck_require__(52018);
+const hasFlag = __nccwpck_require__(92745);
+
+const {env} = process;
+
+let forceColor;
+if (hasFlag('no-color') ||
+	hasFlag('no-colors') ||
+	hasFlag('color=false') ||
+	hasFlag('color=never')) {
+	forceColor = 0;
+} else if (hasFlag('color') ||
+	hasFlag('colors') ||
+	hasFlag('color=true') ||
+	hasFlag('color=always')) {
+	forceColor = 1;
+}
+
+if ('FORCE_COLOR' in env) {
+	if (env.FORCE_COLOR === 'true') {
+		forceColor = 1;
+	} else if (env.FORCE_COLOR === 'false') {
+		forceColor = 0;
+	} else {
+		forceColor = env.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env.FORCE_COLOR, 10), 3);
+	}
+}
+
+function translateLevel(level) {
+	if (level === 0) {
+		return false;
+	}
+
+	return {
+		level,
+		hasBasic: true,
+		has256: level >= 2,
+		has16m: level >= 3
+	};
+}
+
+function supportsColor(haveStream, streamIsTTY) {
+	if (forceColor === 0) {
+		return 0;
+	}
+
+	if (hasFlag('color=16m') ||
+		hasFlag('color=full') ||
+		hasFlag('color=truecolor')) {
+		return 3;
+	}
+
+	if (hasFlag('color=256')) {
+		return 2;
+	}
+
+	if (haveStream && !streamIsTTY && forceColor === undefined) {
+		return 0;
+	}
+
+	const min = forceColor || 0;
+
+	if (env.TERM === 'dumb') {
+		return min;
+	}
+
+	if (process.platform === 'win32') {
+		// Windows 10 build 10586 is the first Windows release that supports 256 colors.
+		// Windows 10 build 14931 is the first release that supports 16m/TrueColor.
+		const osRelease = os.release().split('.');
+		if (
+			Number(osRelease[0]) >= 10 &&
+			Number(osRelease[2]) >= 10586
+		) {
+			return Number(osRelease[2]) >= 14931 ? 3 : 2;
+		}
+
+		return 1;
+	}
+
+	if ('CI' in env) {
+		if (['TRAVIS', 'CIRCLECI', 'APPVEYOR', 'GITLAB_CI', 'GITHUB_ACTIONS', 'BUILDKITE'].some(sign => sign in env) || env.CI_NAME === 'codeship') {
+			return 1;
+		}
+
+		return min;
+	}
+
+	if ('TEAMCITY_VERSION' in env) {
+		return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env.TEAMCITY_VERSION) ? 1 : 0;
+	}
+
+	if (env.COLORTERM === 'truecolor') {
+		return 3;
+	}
+
+	if ('TERM_PROGRAM' in env) {
+		const version = parseInt((env.TERM_PROGRAM_VERSION || '').split('.')[0], 10);
+
+		switch (env.TERM_PROGRAM) {
+			case 'iTerm.app':
+				return version >= 3 ? 3 : 2;
+			case 'Apple_Terminal':
+				return 2;
+			// No default
+		}
+	}
+
+	if (/-256(color)?$/i.test(env.TERM)) {
+		return 2;
+	}
+
+	if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env.TERM)) {
+		return 1;
+	}
+
+	if ('COLORTERM' in env) {
+		return 1;
+	}
+
+	return min;
+}
+
+function getSupportLevel(stream) {
+	const level = supportsColor(stream, stream && stream.isTTY);
+	return translateLevel(level);
+}
+
+module.exports = {
+	supportsColor: getSupportLevel,
+	stdout: translateLevel(supportsColor(true, tty.isatty(1))),
+	stderr: translateLevel(supportsColor(true, tty.isatty(2)))
+};
+
+
+/***/ }),
+
 /***/ 84970:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -84034,9 +84193,14 @@ exports.buildScanArgs = buildScanArgs;
 exports.buildSarifArgs = buildSarifArgs;
 /**
  * Build CLI arguments for the main scan command.
+ *
+ * `extraReports` are written in the same pass via `--reports` (CLI >= 1.44.0).
+ * For older CLIs the caller omits them and falls back to a second `scan` run
+ * built with {@link buildSarifArgs}.
+ *
  * Pure function — no side effects, fully testable.
  */
-function buildScanArgs(inputs) {
+function buildScanArgs(inputs, extraReports = []) {
     const args = ['scan'];
     // Stack name or analyze all
     if (inputs.stackName) {
@@ -84071,12 +84235,24 @@ function buildScanArgs(inputs) {
     if (inputs.ruleFilter.length > 0) {
         args.push('--ruleFilter', ...inputs.ruleFilter);
     }
-    // Output as JSON (CLI auto-generates {stackName}_analysis_report.json)
+    // Output as JSON (CLI auto-generates {stackName}_analysis_report.json).
+    // This is the action's machine-readable source of truth for counts.
     args.push('--format', 'json');
+    // Single-pass extra reports (CLI >= 1.44.0). Writes the SARIF and/or
+    // Markdown report files alongside the JSON one without a second scan,
+    // so we don't re-synthesize, re-run AI, or upload a duplicate scan to
+    // scan history. yargs array option — pass each value as its own arg.
+    if (extraReports.length > 0) {
+        args.push('--reports', ...extraReports);
+    }
     return args;
 }
 /**
- * Build CLI arguments for the SARIF generation run.
+ * Build CLI arguments for a standalone SARIF generation run.
+ *
+ * Only used as a fallback for CLI versions older than 1.44.0, which can't
+ * emit more than one report format per pass. Newer CLIs get SARIF in the
+ * single {@link buildScanArgs} run via `--reports`.
  */
 function buildSarifArgs(inputs) {
     const args = ['scan'];
@@ -84089,6 +84265,12 @@ function buildSarifArgs(inputs) {
     args.push('--yes');
     args.push('--no-failOnCritical');
     args.push('--warn-sensitive');
+    // Match the primary run's AI/static decision so the SARIF reflects the
+    // same findings as the JSON report (e.g. don't run AI here if the main
+    // run was forced local).
+    if (!inputs.aiAnalysis && inputs.licenseKey) {
+        args.push('--local');
+    }
     args.push('--format', 'sarif');
     return args;
 }
@@ -84267,9 +84449,11 @@ function parseInputs() {
     // Parse comma-separated lists
     const failOnInput = core.getInput('fail-on');
     const failOn = failOnInput
-        ? failOnInput.split(',').map(s => s.trim().toLowerCase())
+        ? failOnInput.split(',').map((s) => s.trim().toLowerCase())
         : [];
-    const failOnPillarsInput = (core.getInput('fail-on-pillars') || 'security').trim().toLowerCase();
+    const failOnPillarsInput = (core.getInput('fail-on-pillars') || 'security')
+        .trim()
+        .toLowerCase();
     const knownPillars = [
         'security',
         'reliability',
@@ -84281,7 +84465,10 @@ function parseInputs() {
     const parseFailOnPillars = (raw) => {
         if (raw === 'all')
             return 'all';
-        const entries = raw.split(',').map((s) => s.trim()).filter(Boolean);
+        const entries = raw
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
         const out = [];
         for (const entry of entries) {
             if (knownPillars.includes(entry)) {
@@ -84294,13 +84481,37 @@ function parseInputs() {
         return out.length > 0 ? out : ['security'];
     };
     const failOnPillars = parseFailOnPillars(failOnPillarsInput);
+    const failOnClassInput = core.getInput('fail-on-class');
+    const knownClasses = [
+        'security',
+        'best-practice',
+        'compliance',
+    ];
+    const failOnClass = failOnClassInput
+        ? failOnClassInput
+            .split(',')
+            .map((s) => s.trim().toLowerCase())
+            .filter(Boolean)
+            .filter((entry) => {
+            if (knownClasses.includes(entry))
+                return true;
+            core.warning(`Unknown fail-on-class value "${entry}" — valid values: ${knownClasses.join(', ')}.`);
+            return false;
+        })
+        : [];
     const servicesInput = core.getInput('services');
     const services = servicesInput
-        ? servicesInput.split(',').map(s => s.trim()).filter(s => s.length > 0)
+        ? servicesInput
+            .split(',')
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0)
         : [];
     const ruleFilterInput = core.getInput('rule-filter');
     const ruleFilter = ruleFilterInput
-        ? ruleFilterInput.split(',').map(s => s.trim()).filter(s => s.length > 0)
+        ? ruleFilterInput
+            .split(',')
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0)
         : [];
     // --- Input validation ---
     // Validate stack name (prevents argument injection via --flag-like names)
@@ -84338,6 +84549,7 @@ function parseInputs() {
     }
     core.info(`  Fail On: ${failOn.length > 0 ? failOn.join(', ') : '(none)'}`);
     core.info(`  Fail On Pillars: ${failOnPillars === 'all' ? 'all' : failOnPillars.join(', ')}`);
+    core.info(`  Fail On Class: ${failOnClass.length > 0 ? failOnClass.join(', ') : '(none)'}`);
     if (services.length > 0) {
         core.info(`  Services: ${services.join(', ')}`);
     }
@@ -84352,6 +84564,7 @@ function parseInputs() {
         aiAnalysis,
         failOn,
         failOnPillars,
+        failOnClass,
         prComment,
         sarifUpload,
         uploadArtifact,
@@ -84415,8 +84628,8 @@ const outputs_1 = __nccwpck_require__(7729);
 const args_1 = __nccwpck_require__(84970);
 const sarif_upload_1 = __nccwpck_require__(68830);
 const artifact_upload_1 = __nccwpck_require__(79579);
+const report_utils_1 = __nccwpck_require__(46425);
 const TOOL_NAME = 'cdk-insights';
-const REPORT_SUFFIX = '_analysis_report';
 /**
  * Resolve the version string to install.
  * If 'latest', queries npm for the actual version number (needed for cache key).
@@ -84425,7 +84638,13 @@ async function resolveVersion(version) {
     if (version !== 'latest')
         return version;
     let stdout = '';
-    await exec.exec('npm', ['view', 'cdk-insights', 'version', '--registry', 'https://registry.npmjs.org'], {
+    await exec.exec('npm', [
+        'view',
+        'cdk-insights',
+        'version',
+        '--registry',
+        'https://registry.npmjs.org',
+    ], {
         silent: true,
         listeners: {
             stdout: (data) => {
@@ -84438,6 +84657,7 @@ async function resolveVersion(version) {
 /**
  * Install cdk-insights CLI with tool caching.
  * On first run: installs via npm and caches. On subsequent runs: restores from cache.
+ * Returns the resolved (numeric) version so the caller can gate features.
  */
 async function installCdkInsights(requestedVersion) {
     const version = await resolveVersion(requestedVersion);
@@ -84447,7 +84667,7 @@ async function installCdkInsights(requestedVersion) {
     if (cachedPath) {
         core.info(`Using cached cdk-insights ${version}`);
         core.addPath(path.join(cachedPath, 'bin'));
-        return;
+        return version;
     }
     // Not cached — install to a temp directory and cache it
     core.info(`Installing cdk-insights@${version}...`);
@@ -84455,8 +84675,10 @@ async function installCdkInsights(requestedVersion) {
     fs.mkdirSync(installDir, { recursive: true });
     await exec.exec('npm', [
         'install',
-        '--prefix', installDir,
-        '--registry', 'https://registry.npmjs.org',
+        '--prefix',
+        installDir,
+        '--registry',
+        'https://registry.npmjs.org',
         `cdk-insights@${version}`,
     ], {
         silent: false,
@@ -84471,6 +84693,7 @@ async function installCdkInsights(requestedVersion) {
     const cached = await tc.cacheDir(installDir, TOOL_NAME, version);
     core.addPath(path.join(cached, 'node_modules', '.bin'));
     core.info(`cdk-insights ${version} installed and cached`);
+    return version;
 }
 async function runAnalysis(args, workingDirectory, licenseKey) {
     let stdout = '';
@@ -84530,22 +84753,36 @@ async function runAnalysis(args, workingDirectory, licenseKey) {
 function findReportFiles(dir, ext) {
     if (!fs.existsSync(dir))
         return [];
-    const suffix = `${REPORT_SUFFIX}.${ext}`;
-    return fs.readdirSync(dir)
-        .filter(f => f.endsWith(suffix))
-        .map(f => path.join(dir, f));
+    const suffix = `${report_utils_1.REPORT_SUFFIX}.${ext}`;
+    return fs
+        .readdirSync(dir)
+        .filter((f) => f.endsWith(suffix))
+        .map((f) => path.join(dir, f));
 }
 async function run() {
     try {
         const inputs = (0, inputs_1.parseInputs)();
         core.startGroup('Setup');
-        await installCdkInsights(inputs.cdkInsightsVersion);
+        const resolvedVersion = await installCdkInsights(inputs.cdkInsightsVersion);
         core.endGroup();
         // Warn if AI requested without license
         if (inputs.aiAnalysis && !inputs.licenseKey) {
             core.warning('AI analysis requested but no license key provided - using static analysis only');
         }
-        const args = (0, args_1.buildScanArgs)(inputs);
+        // CLI >= 1.44.0 writes every requested report file in a single pass via
+        // --reports. Older CLIs need a separate scan per format, so SARIF falls
+        // back to a second run and markdown can't be produced at all.
+        const supportsReports = (0, report_utils_1.versionGte)(resolvedVersion, report_utils_1.REPORTS_FLAG_MIN_VERSION);
+        // Extra report files to request in the single pass: SARIF only when we'll
+        // upload it, markdown only when it'll be kept as an artifact.
+        const extraReports = [];
+        if (supportsReports) {
+            if (inputs.sarifUpload)
+                extraReports.push('sarif');
+            if (inputs.uploadArtifact)
+                extraReports.push('markdown');
+        }
+        const args = (0, args_1.buildScanArgs)(inputs, extraReports);
         core.startGroup('Running CDK Insights Analysis');
         core.info(`Command: cdk-insights ${args.join(' ')}`);
         const { exitCode, stdout, stderr } = await runAnalysis(args, inputs.workingDirectory, inputs.licenseKey);
@@ -84560,7 +84797,9 @@ async function run() {
         const jsonFiles = findReportFiles(inputs.workingDirectory, 'json');
         // Distinguish CLI crash from normal analysis results
         if (exitCode !== 0 && jsonFiles.length === 0) {
-            const errorMsg = stderr.trim() || stdout.trim() || `cdk-insights exited with code ${exitCode}`;
+            const errorMsg = stderr.trim() ||
+                stdout.trim() ||
+                `cdk-insights exited with code ${exitCode}`;
             throw new Error(`CDK Insights CLI failed: ${errorMsg}`);
         }
         if (jsonFiles.length === 0) {
@@ -84575,21 +84814,35 @@ async function run() {
         // via `fail-on-pillars`.
         core.startGroup('Processing Results');
         const results = (0, outputs_1.aggregateResults)(jsonFiles, inputs.failOnPillars);
-        // Generate SARIF file if requested
+        // Resolve SARIF files if requested. In single-pass mode the CLI already
+        // wrote them in the run above; on older CLIs we do a dedicated SARIF pass.
+        // Either way, selectSarifFiles collapses the per-stack + consolidated set
+        // to a single non-duplicating upload.
         let sarifFiles = [];
         if (inputs.sarifUpload) {
-            core.info('Generating SARIF output...');
-            const sarifArgs = (0, args_1.buildSarifArgs)(inputs);
-            const sarifResult = await runAnalysis(sarifArgs, inputs.workingDirectory, inputs.licenseKey);
-            sarifFiles = findReportFiles(inputs.workingDirectory, 'sarif');
-            if (sarifResult.exitCode !== 0 && sarifFiles.length === 0) {
-                core.warning(`SARIF generation failed: ${sarifResult.stderr.trim() || `exit code ${sarifResult.exitCode}`}`);
-            }
-            else if (sarifFiles.length > 0) {
-                core.info(`SARIF file(s) generated: ${sarifFiles.join(', ')}`);
+            if (supportsReports) {
+                sarifFiles = (0, report_utils_1.selectSarifFiles)(findReportFiles(inputs.workingDirectory, 'sarif'));
+                if (sarifFiles.length > 0) {
+                    core.info(`SARIF file(s) generated: ${sarifFiles.join(', ')}`);
+                }
+                else {
+                    core.warning('SARIF upload requested but no SARIF files were produced');
+                }
             }
             else {
-                core.warning('SARIF generation requested but no SARIF files were produced');
+                core.info('Generating SARIF output (second pass — cdk-insights < 1.44.0)...');
+                const sarifArgs = (0, args_1.buildSarifArgs)(inputs);
+                const sarifResult = await runAnalysis(sarifArgs, inputs.workingDirectory, inputs.licenseKey);
+                sarifFiles = (0, report_utils_1.selectSarifFiles)(findReportFiles(inputs.workingDirectory, 'sarif'));
+                if (sarifResult.exitCode !== 0 && sarifFiles.length === 0) {
+                    core.warning(`SARIF generation failed: ${sarifResult.stderr.trim() || `exit code ${sarifResult.exitCode}`}`);
+                }
+                else if (sarifFiles.length > 0) {
+                    core.info(`SARIF file(s) generated: ${sarifFiles.join(', ')}`);
+                }
+                else {
+                    core.warning('SARIF generation requested but no SARIF files were produced');
+                }
             }
         }
         // Auto-upload SARIF to GitHub Code Scanning (Security tab)
@@ -84607,15 +84860,17 @@ async function run() {
             artifactId = await (0, artifact_upload_1.uploadReportArtifacts)(allReportFiles, inputs.artifactName, inputs.workingDirectory);
             core.endGroup();
         }
-        (0, outputs_1.setOutputs)(results, jsonFiles, inputs.failOn, sarifFiles, artifactId);
+        (0, outputs_1.setOutputs)(results, jsonFiles, inputs.failOn, inputs.failOnClass, sarifFiles, artifactId);
         core.endGroup();
-        // Check fail conditions. The counts used here are already
+        // Check fail conditions. The severity counts used here are already
         // pillar-scoped (see aggregateResults) so e.g. a Reliability
         // CRITICAL never triggers a failure under the default
         // fail-on-pillars: security.
         const pillarScope = inputs.failOnPillars === 'all'
             ? 'all pillars'
             : inputs.failOnPillars.join(', ');
+        const failReasons = [];
+        // Severity gate (pillar-scoped) — only when fail-on is configured.
         if (inputs.failOn.length > 0) {
             const failConditions = [];
             const gating = results.gatingCounts;
@@ -84632,9 +84887,22 @@ async function run() {
                 failConditions.push(`${gating.lowCount} low`);
             }
             if (failConditions.length > 0) {
-                core.setFailed(`Analysis found issues at configured severity levels (${pillarScope}): ${failConditions.join(', ')}`);
-                return;
+                failReasons.push(`severity (${pillarScope}): ${failConditions.join(', ')}`);
             }
+        }
+        // Finding-class gate — orthogonal to severity and pillar. Blocks on real
+        // risk (security/compliance) while best-practice advice can stay advisory.
+        if (inputs.failOnClass.length > 0) {
+            const classHits = inputs.failOnClass
+                .filter((c) => (results.classCounts[c] ?? 0) > 0)
+                .map((c) => `${results.classCounts[c]} ${c}`);
+            if (classHits.length > 0) {
+                failReasons.push(`finding class: ${classHits.join(', ')}`);
+            }
+        }
+        if (failReasons.length > 0) {
+            core.setFailed(`Analysis found blocking issues — ${failReasons.join('; ')}`);
+            return;
         }
         // Success summary
         const totals = results.totalCounts;
@@ -84648,6 +84916,9 @@ async function run() {
         core.info(`  Medium: ${totals.mediumCount}`);
         core.info(`  Low: ${totals.lowCount}`);
         core.info(`Fail-on pillars: ${pillarScope}`);
+        if (inputs.failOnClass.length > 0) {
+            core.info(`Fail-on classes: ${inputs.failOnClass.join(', ')}`);
+        }
     }
     catch (error) {
         if (error instanceof Error) {
@@ -84758,6 +85029,7 @@ function parseResults(jsonPath, failOnPillars) {
         totalIssues: 0,
         totalCounts: emptyCounts(),
         gatingCounts: emptyCounts(),
+        classCounts: {},
         resourceCount: 0,
     };
     if (!fs.existsSync(jsonPath)) {
@@ -84769,6 +85041,7 @@ function parseResults(jsonPath, failOnPillars) {
         const report = JSON.parse(content);
         const totalCounts = emptyCounts();
         const gatingCounts = emptyCounts();
+        const classCounts = {};
         let totalIssues = 0;
         let resourceCount = 0;
         if (report.recommendations && Array.isArray(report.recommendations)) {
@@ -84784,12 +85057,17 @@ function parseResults(jsonPath, failOnPillars) {
                     if (matchesFailOnPillar(issue.wafPillar, failOnPillars)) {
                         bumpCount(gatingCounts, issue.severity);
                     }
+                    if (issue.findingClass) {
+                        const cls = issue.findingClass.toLowerCase().trim();
+                        classCounts[cls] = (classCounts[cls] ?? 0) + 1;
+                    }
                 }
             }
             return {
                 totalIssues,
                 totalCounts,
                 gatingCounts,
+                classCounts,
                 resourceCount,
             };
         }
@@ -84807,6 +85085,9 @@ function parseResults(jsonPath, failOnPillars) {
                 totalIssues: report.summary.totalIssues ?? 0,
                 totalCounts: summaryCounts,
                 gatingCounts: summaryCounts,
+                // Summary-only reports carry no per-issue class data, so the
+                // class gate can't fire on them (fails open — never blocks).
+                classCounts: {},
                 resourceCount: report.summary.totalResources ?? 0,
             };
         }
@@ -84825,6 +85106,7 @@ function aggregateResults(jsonPaths, failOnPillars) {
         totalIssues: 0,
         totalCounts: emptyCounts(),
         gatingCounts: emptyCounts(),
+        classCounts: {},
         resourceCount: 0,
     };
     for (const jsonPath of jsonPaths) {
@@ -84832,6 +85114,9 @@ function aggregateResults(jsonPaths, failOnPillars) {
         combined.totalIssues += result.totalIssues;
         combined.totalCounts = addCounts(combined.totalCounts, result.totalCounts);
         combined.gatingCounts = addCounts(combined.gatingCounts, result.gatingCounts);
+        for (const [cls, n] of Object.entries(result.classCounts)) {
+            combined.classCounts[cls] = (combined.classCounts[cls] ?? 0) + n;
+        }
         combined.resourceCount += result.resourceCount;
     }
     return combined;
@@ -84844,7 +85129,7 @@ function aggregateResults(jsonPaths, failOnPillars) {
  * `gatingCounts` — findings whose pillar is in the user's
  * `fail-on-pillars` allowlist (default: security only).
  */
-function setOutputs(results, jsonPaths, failOn, sarifPaths, artifactId) {
+function setOutputs(results, jsonPaths, failOn, failOnClass, sarifPaths, artifactId) {
     core.setOutput('total-issues', results.totalIssues.toString());
     core.setOutput('critical-count', results.totalCounts.criticalCount.toString());
     core.setOutput('high-count', results.totalCounts.highCount.toString());
@@ -84874,7 +85159,102 @@ function setOutputs(results, jsonPaths, failOn, sarifPaths, artifactId) {
             results.gatingCounts.lowCount;
         exitCode = totalInScope > 0 ? 1 : 0;
     }
+    // Finding-class gate is orthogonal to severity/pillar — fold it into the
+    // exit code so a security/compliance finding fails even when severity
+    // gating wouldn't (e.g. a MEDIUM security finding under fail-on: critical).
+    if (exitCode === 0 &&
+        failOnClass.some((cls) => (results.classCounts[cls] ?? 0) > 0)) {
+        exitCode = 1;
+    }
     core.setOutput('exit-code', exitCode.toString());
+}
+
+
+/***/ }),
+
+/***/ 46425:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.REPORTS_FLAG_MIN_VERSION = exports.CONSOLIDATED_SARIF = exports.REPORT_SUFFIX = void 0;
+exports.versionGte = versionGte;
+exports.selectSarifFiles = selectSarifFiles;
+const path = __importStar(__nccwpck_require__(16928));
+/** Suffix the CLI appends to every report file: `{stack}_analysis_report.<ext>`. */
+exports.REPORT_SUFFIX = '_analysis_report';
+/** Basename of the cross-stack SARIF the CLI writes in multi-stack runs. */
+exports.CONSOLIDATED_SARIF = `consolidated${exports.REPORT_SUFFIX}.sarif`;
+/** First CLI version that supports single-pass `--reports` output. */
+exports.REPORTS_FLAG_MIN_VERSION = '1.44.0';
+/**
+ * Compare two semver-ish strings on their numeric major.minor.patch core
+ * (pre-release suffixes are ignored). Returns true when `version` >= `min`.
+ * Used to gate features the action relies on in newer CLI releases.
+ */
+function versionGte(version, min) {
+    const core3 = (v) => {
+        const [maj, minr, pat] = v
+            .replace(/^v/, '')
+            .split('-')[0]
+            .split('.')
+            .map((n) => Number.parseInt(n, 10) || 0);
+        return [maj, minr, pat];
+    };
+    const [a, b, c] = core3(version);
+    const [x, y, z] = core3(min);
+    if (a !== x)
+        return a > x;
+    if (b !== y)
+        return b > y;
+    return c >= z;
+}
+/**
+ * Pick the SARIF file(s) to act on, avoiding duplicate findings.
+ *
+ * In multi-stack (`--all`) mode the CLI writes one `{stack}_analysis_report.sarif`
+ * per stack AND a `consolidated_analysis_report.sarif` that is the union of all
+ * of them. Uploading every file to Code Scanning would push the same findings
+ * twice. When the consolidated file is present we use only it; otherwise (single
+ * stack) we use the per-stack file(s).
+ */
+function selectSarifFiles(sarifFiles) {
+    const consolidated = sarifFiles.find((f) => path.basename(f) === exports.CONSOLIDATED_SARIF);
+    return consolidated ? [consolidated] : sarifFiles;
 }
 
 
@@ -84965,14 +85345,6 @@ async function uploadSarifToCodeScanning(sarifPaths, token) {
 /***/ ((module) => {
 
 module.exports = eval("require")("encoding");
-
-
-/***/ }),
-
-/***/ 60075:
-/***/ ((module) => {
-
-module.exports = eval("require")("supports-color");
 
 
 /***/ }),

@@ -1,6 +1,6 @@
 import * as core from '@actions/core';
 import * as fs from 'fs';
-import type { PillarKey } from './inputs';
+import type { FindingClassKey, PillarKey } from './inputs';
 
 type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
@@ -22,6 +22,13 @@ export interface AnalysisResults {
    * `'all'`.
    */
   gatingCounts: SeverityCounts;
+  /**
+   * Number of findings per `findingClass` across the whole report (not
+   * pillar-scoped). Drives the `fail-on-class` gate, which is orthogonal to
+   * severity. Keys are the lower-cased class values the CLI emits
+   * (`security` | `best-practice` | `compliance`).
+   */
+  classCounts: Record<string, number>;
   resourceCount: number;
 }
 
@@ -31,6 +38,8 @@ interface Issue {
   issue: string;
   recommendation?: string;
   wafPillar?: string;
+  /** Finding class axis (security | best-practice | compliance) — CLI >= 1.43.0. */
+  findingClass?: string;
   foundBy?: string;
 }
 
@@ -113,6 +122,7 @@ export function parseResults(
     totalIssues: 0,
     totalCounts: emptyCounts(),
     gatingCounts: emptyCounts(),
+    classCounts: {},
     resourceCount: 0,
   };
 
@@ -127,6 +137,7 @@ export function parseResults(
 
     const totalCounts = emptyCounts();
     const gatingCounts = emptyCounts();
+    const classCounts: Record<string, number> = {};
     let totalIssues = 0;
     let resourceCount = 0;
 
@@ -141,12 +152,17 @@ export function parseResults(
           if (matchesFailOnPillar(issue.wafPillar, failOnPillars)) {
             bumpCount(gatingCounts, issue.severity);
           }
+          if (issue.findingClass) {
+            const cls = issue.findingClass.toLowerCase().trim();
+            classCounts[cls] = (classCounts[cls] ?? 0) + 1;
+          }
         }
       }
       return {
         totalIssues,
         totalCounts,
         gatingCounts,
+        classCounts,
         resourceCount,
       };
     }
@@ -165,6 +181,9 @@ export function parseResults(
         totalIssues: report.summary.totalIssues ?? 0,
         totalCounts: summaryCounts,
         gatingCounts: summaryCounts,
+        // Summary-only reports carry no per-issue class data, so the
+        // class gate can't fire on them (fails open — never blocks).
+        classCounts: {},
         resourceCount: report.summary.totalResources ?? 0,
       };
     }
@@ -189,6 +208,7 @@ export function aggregateResults(
     totalIssues: 0,
     totalCounts: emptyCounts(),
     gatingCounts: emptyCounts(),
+    classCounts: {},
     resourceCount: 0,
   };
 
@@ -196,7 +216,13 @@ export function aggregateResults(
     const result = parseResults(jsonPath, failOnPillars);
     combined.totalIssues += result.totalIssues;
     combined.totalCounts = addCounts(combined.totalCounts, result.totalCounts);
-    combined.gatingCounts = addCounts(combined.gatingCounts, result.gatingCounts);
+    combined.gatingCounts = addCounts(
+      combined.gatingCounts,
+      result.gatingCounts,
+    );
+    for (const [cls, n] of Object.entries(result.classCounts)) {
+      combined.classCounts[cls] = (combined.classCounts[cls] ?? 0) + n;
+    }
     combined.resourceCount += result.resourceCount;
   }
 
@@ -215,11 +241,15 @@ export function setOutputs(
   results: AnalysisResults,
   jsonPaths: string[],
   failOn: string[],
+  failOnClass: FindingClassKey[],
   sarifPaths: string[],
   artifactId?: number | null,
 ): void {
   core.setOutput('total-issues', results.totalIssues.toString());
-  core.setOutput('critical-count', results.totalCounts.criticalCount.toString());
+  core.setOutput(
+    'critical-count',
+    results.totalCounts.criticalCount.toString(),
+  );
   core.setOutput('high-count', results.totalCounts.highCount.toString());
   core.setOutput('medium-count', results.totalCounts.mediumCount.toString());
   core.setOutput('low-count', results.totalCounts.lowCount.toString());
@@ -251,5 +281,16 @@ export function setOutputs(
       results.gatingCounts.lowCount;
     exitCode = totalInScope > 0 ? 1 : 0;
   }
+
+  // Finding-class gate is orthogonal to severity/pillar — fold it into the
+  // exit code so a security/compliance finding fails even when severity
+  // gating wouldn't (e.g. a MEDIUM security finding under fail-on: critical).
+  if (
+    exitCode === 0 &&
+    failOnClass.some((cls) => (results.classCounts[cls] ?? 0) > 0)
+  ) {
+    exitCode = 1;
+  }
+
   core.setOutput('exit-code', exitCode.toString());
 }

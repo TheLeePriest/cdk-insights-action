@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-06-19
+
+### Added
+
+- `fail-on-class` input — fail the build on findings of a given **finding class** (`security`, `best-practice`, `compliance`), independent of severity and pillar. This complements `fail-on` / `fail-on-pillars`: a team can block on real risk (security / compliance) while best-practice advice stays advisory, even at the same severity. Gated action-side from the `findingClass` field the CLI emits (cdk-insights >= 1.43.0); older CLIs emit no class data, so the gate is a safe no-op. The `exit-code` output also reflects the class gate.
+
+### Changed
+
+- **Single-pass report generation (cdk-insights >= 1.44.0).** When SARIF and/or artifact reports are requested, the action now runs `cdk-insights scan` **once** with `--reports`, which writes the JSON, SARIF, and Markdown report files in a single analysis pass. Previously the action ran the CLI a second time purely to produce SARIF — re-synthesizing, re-running rules/AI, and (for licensed users) uploading a duplicate scan to scan history on every run. The action falls back to the previous two-run behaviour automatically on CLI versions older than 1.44.0.
+- **Markdown report is now actually produced.** Because the single pass emits Markdown alongside JSON and SARIF, the `{stack}_analysis_report.md` files are now included in the uploaded artifact as documented. (Under the old json-only / sarif-only runs the CLI never wrote a Markdown report, so the artifact silently contained none.)
+
+### Fixed
+
+- **Duplicate SARIF uploads in multi-stack mode.** In `--all` mode the CLI writes a per-stack `{stack}_analysis_report.sarif` for every stack *and* a `consolidated_analysis_report.sarif` containing the union. The action uploaded all of them to GitHub Code Scanning, double-reporting every finding. It now uploads only the consolidated file when present (falling back to the per-stack file for single-stack runs). The same de-duplication applies to the report artifact.
+- The legacy SARIF fallback run now mirrors the primary run's `--local` decision, so a license-holder who set `ai-analysis: false` no longer triggers AI analysis (and AI-credit spend) during SARIF generation.
+
 ## [1.4.0] - 2026-04-21
 
 ### Added

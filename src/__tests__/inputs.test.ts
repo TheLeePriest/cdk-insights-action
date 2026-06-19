@@ -17,16 +17,19 @@ function mockInputs(overrides: Record<string, string> = {}): void {
     'upload-artifact': 'true',
     'artifact-name': 'cdk-insights-report',
     'github-token': '',
-    'services': '',
+    services: '',
     'rule-filter': '',
     'fail-on': '',
+    'fail-on-class': '',
     'cdk-insights-version': 'latest',
   };
 
   const values = { ...defaults, ...overrides };
 
   mockedCore.getInput.mockImplementation((name: string) => values[name] || '');
-  mockedCore.getBooleanInput.mockImplementation((name: string) => values[name] === 'true');
+  mockedCore.getBooleanInput.mockImplementation(
+    (name: string) => values[name] === 'true',
+  );
 }
 
 beforeEach(() => {
@@ -46,9 +49,29 @@ describe('parseInputs', () => {
     expect(result.prComment).toBe(true);
     expect(result.sarifUpload).toBe(false);
     expect(result.failOn).toEqual([]);
+    expect(result.failOnClass).toEqual([]);
     expect(result.services).toEqual([]);
     expect(result.ruleFilter).toEqual([]);
     expect(result.cdkInsightsVersion).toBe('latest');
+  });
+
+  it('parses and lowercases comma-separated fail-on-class values', () => {
+    mockInputs({ 'fail-on-class': 'Security, Compliance' });
+
+    const result = parseInputs();
+
+    expect(result.failOnClass).toEqual(['security', 'compliance']);
+  });
+
+  it('drops unknown fail-on-class values with a warning', () => {
+    mockInputs({ 'fail-on-class': 'security,bogus' });
+
+    const result = parseInputs();
+
+    expect(result.failOnClass).toEqual(['security']);
+    expect(mockedCore.warning).toHaveBeenCalledWith(
+      expect.stringContaining('Unknown fail-on-class value "bogus"'),
+    );
   });
 
   it('parses comma-separated fail-on values', () => {
@@ -73,12 +96,12 @@ describe('parseInputs', () => {
     parseInputs();
 
     expect(mockedCore.warning).toHaveBeenCalledWith(
-      expect.stringContaining('Invalid severity in fail-on: invalid')
+      expect.stringContaining('Invalid severity in fail-on: invalid'),
     );
   });
 
   it('parses comma-separated services', () => {
-    mockInputs({ 'services': 'S3, Lambda, DynamoDB' });
+    mockInputs({ services: 'S3, Lambda, DynamoDB' });
 
     const result = parseInputs();
 
@@ -180,7 +203,7 @@ describe('parseInputs', () => {
   });
 
   it('rejects service with flag-like value', () => {
-    mockInputs({ 'services': 'S3,--inject' });
+    mockInputs({ services: 'S3,--inject' });
 
     expect(() => parseInputs()).toThrow('must not start with a hyphen');
   });
@@ -225,7 +248,7 @@ describe('parseInputs', () => {
   });
 
   it('filters empty strings from services list', () => {
-    mockInputs({ 'services': 'S3,,Lambda,' });
+    mockInputs({ services: 'S3,,Lambda,' });
 
     const result = parseInputs();
     expect(result.services).toEqual(['S3', 'Lambda']);

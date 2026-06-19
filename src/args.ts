@@ -1,10 +1,24 @@
 import { ActionInputs } from './inputs';
 
 /**
+ * Extra report-file formats the CLI's `--reports` flag understands. JSON is
+ * always the primary `--format`, so it's never passed here.
+ */
+export type ExtraReportFormat = 'sarif' | 'markdown';
+
+/**
  * Build CLI arguments for the main scan command.
+ *
+ * `extraReports` are written in the same pass via `--reports` (CLI >= 1.44.0).
+ * For older CLIs the caller omits them and falls back to a second `scan` run
+ * built with {@link buildSarifArgs}.
+ *
  * Pure function — no side effects, fully testable.
  */
-export function buildScanArgs(inputs: ActionInputs): string[] {
+export function buildScanArgs(
+  inputs: ActionInputs,
+  extraReports: ExtraReportFormat[] = [],
+): string[] {
   const args: string[] = ['scan'];
 
   // Stack name or analyze all
@@ -47,14 +61,27 @@ export function buildScanArgs(inputs: ActionInputs): string[] {
     args.push('--ruleFilter', ...inputs.ruleFilter);
   }
 
-  // Output as JSON (CLI auto-generates {stackName}_analysis_report.json)
+  // Output as JSON (CLI auto-generates {stackName}_analysis_report.json).
+  // This is the action's machine-readable source of truth for counts.
   args.push('--format', 'json');
+
+  // Single-pass extra reports (CLI >= 1.44.0). Writes the SARIF and/or
+  // Markdown report files alongside the JSON one without a second scan,
+  // so we don't re-synthesize, re-run AI, or upload a duplicate scan to
+  // scan history. yargs array option — pass each value as its own arg.
+  if (extraReports.length > 0) {
+    args.push('--reports', ...extraReports);
+  }
 
   return args;
 }
 
 /**
- * Build CLI arguments for the SARIF generation run.
+ * Build CLI arguments for a standalone SARIF generation run.
+ *
+ * Only used as a fallback for CLI versions older than 1.44.0, which can't
+ * emit more than one report format per pass. Newer CLIs get SARIF in the
+ * single {@link buildScanArgs} run via `--reports`.
  */
 export function buildSarifArgs(inputs: ActionInputs): string[] {
   const args: string[] = ['scan'];
@@ -68,6 +95,14 @@ export function buildSarifArgs(inputs: ActionInputs): string[] {
   args.push('--yes');
   args.push('--no-failOnCritical');
   args.push('--warn-sensitive');
+
+  // Match the primary run's AI/static decision so the SARIF reflects the
+  // same findings as the JSON report (e.g. don't run AI here if the main
+  // run was forced local).
+  if (!inputs.aiAnalysis && inputs.licenseKey) {
+    args.push('--local');
+  }
+
   args.push('--format', 'sarif');
 
   return args;

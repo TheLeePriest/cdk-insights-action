@@ -10,6 +10,7 @@ function defaultInputs(overrides: Partial<ActionInputs> = {}): ActionInputs {
     aiAnalysis: false,
     failOn: [],
     failOnPillars: ['security'],
+    failOnClass: [],
     prComment: true,
     sarifUpload: false,
     uploadArtifact: true,
@@ -52,36 +53,44 @@ describe('buildScanArgs', () => {
   });
 
   it('passes --local when license key provided but ai-analysis is false', () => {
-    const args = buildScanArgs(defaultInputs({
-      licenseKey: 'key-123',
-      aiAnalysis: false,
-    }));
+    const args = buildScanArgs(
+      defaultInputs({
+        licenseKey: 'key-123',
+        aiAnalysis: false,
+      }),
+    );
 
     expect(args).toContain('--local');
   });
 
   it('does not pass --local when ai-analysis is true with license key', () => {
-    const args = buildScanArgs(defaultInputs({
-      licenseKey: 'key-123',
-      aiAnalysis: true,
-    }));
+    const args = buildScanArgs(
+      defaultInputs({
+        licenseKey: 'key-123',
+        aiAnalysis: true,
+      }),
+    );
 
     expect(args).not.toContain('--local');
   });
 
   it('does not pass --local when no license key regardless of ai-analysis', () => {
-    const args = buildScanArgs(defaultInputs({
-      licenseKey: '',
-      aiAnalysis: true,
-    }));
+    const args = buildScanArgs(
+      defaultInputs({
+        licenseKey: '',
+        aiAnalysis: true,
+      }),
+    );
 
     expect(args).not.toContain('--local');
   });
 
   it('passes services as individual args', () => {
-    const args = buildScanArgs(defaultInputs({
-      services: ['S3', 'Lambda', 'IAM'],
-    }));
+    const args = buildScanArgs(
+      defaultInputs({
+        services: ['S3', 'Lambda', 'IAM'],
+      }),
+    );
 
     const servicesIdx = args.indexOf('--services');
     expect(servicesIdx).toBeGreaterThan(-1);
@@ -91,9 +100,11 @@ describe('buildScanArgs', () => {
   });
 
   it('passes ruleFilter as individual args', () => {
-    const args = buildScanArgs(defaultInputs({
-      ruleFilter: ['RULE-001', 'RULE-002'],
-    }));
+    const args = buildScanArgs(
+      defaultInputs({
+        ruleFilter: ['RULE-001', 'RULE-002'],
+      }),
+    );
 
     const filterIdx = args.indexOf('--ruleFilter');
     expect(filterIdx).toBeGreaterThan(-1);
@@ -114,10 +125,12 @@ describe('buildScanArgs', () => {
   });
 
   it('never includes --ai flag', () => {
-    const args = buildScanArgs(defaultInputs({
-      aiAnalysis: true,
-      licenseKey: 'key-123',
-    }));
+    const args = buildScanArgs(
+      defaultInputs({
+        aiAnalysis: true,
+        licenseKey: 'key-123',
+      }),
+    );
 
     expect(args).not.toContain('--ai');
   });
@@ -126,6 +139,23 @@ describe('buildScanArgs', () => {
     const args = buildScanArgs(defaultInputs());
 
     expect(args).not.toContain('--outputFile');
+  });
+
+  it('omits --reports when no extra reports requested', () => {
+    const args = buildScanArgs(defaultInputs());
+
+    expect(args).not.toContain('--reports');
+  });
+
+  it('appends --reports with each extra format as its own arg', () => {
+    const args = buildScanArgs(defaultInputs(), ['sarif', 'markdown']);
+
+    const reportsIdx = args.indexOf('--reports');
+    expect(reportsIdx).toBeGreaterThan(-1);
+    expect(args[reportsIdx + 1]).toBe('sarif');
+    expect(args[reportsIdx + 2]).toBe('markdown');
+    // Primary format stays JSON; --reports comes after it.
+    expect(args.indexOf('--format')).toBeLessThan(reportsIdx);
   });
 });
 
@@ -152,12 +182,23 @@ describe('buildSarifArgs', () => {
   });
 
   it('does not include prComment or services in sarif args', () => {
-    const args = buildSarifArgs(defaultInputs({
-      prComment: true,
-      services: ['S3'],
-    }));
+    const args = buildSarifArgs(
+      defaultInputs({
+        prComment: true,
+        services: ['S3'],
+      }),
+    );
 
     expect(args).not.toContain('--prComment');
     expect(args).not.toContain('--services');
+  });
+
+  it('mirrors the primary run --local decision so SARIF matches the JSON findings', () => {
+    expect(
+      buildSarifArgs(defaultInputs({ licenseKey: 'k', aiAnalysis: false })),
+    ).toContain('--local');
+    expect(
+      buildSarifArgs(defaultInputs({ licenseKey: 'k', aiAnalysis: true })),
+    ).not.toContain('--local');
   });
 });

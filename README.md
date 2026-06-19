@@ -10,6 +10,8 @@ Static and AI-powered analysis for AWS CDK — runs `cdk-insights scan` against 
 - **GitHub Code Scanning** — SARIF generated and auto-uploaded to the Security tab
 - **Report artifacts** — JSON, SARIF, and markdown reports persisted as downloadable workflow artifacts
 - **Per-pillar fail gating** — fail the build on Security findings only (default), or opt into Reliability / Cost / etc.
+- **Per-class fail gating** — block on `security` / `compliance` findings while best-practice advice stays advisory, independent of severity (`fail-on-class`)
+- **Single-pass reports** — with `cdk-insights >= 1.44.0` the JSON, SARIF, and Markdown reports are produced from one scan (no duplicate analysis or scan-history upload)
 - **CLI caching** — the `cdk-insights` npm package is cached via `@actions/tool-cache`, so subsequent runs skip the install step
 
 ## Quick Start
@@ -53,6 +55,7 @@ jobs:
 | `ai-analysis` | Enable AI-powered recommendations. Requires `license-key`. Set to `false` with a license key to pass `--local` and force static-only analysis. | No | `false` |
 | `fail-on` | Fail workflow on severity levels (comma-separated: `critical,high,medium,low`). Omit to fail on any finding within `fail-on-pillars` scope. | No | - |
 | `fail-on-pillars` | Which Well-Architected pillars count toward `fail-on`. Comma-separated list of `security`, `reliability`, `cost optimization`, `operational excellence`, `performance efficiency`, `sustainability`, or the shorthand `all`. Findings from other pillars are still reported but won't block the deploy. | No | `security` |
+| `fail-on-class` | Fail the build on findings of these **classes**, regardless of severity or pillar. Comma-separated list of `security`, `best-practice`, `compliance`. Orthogonal to `fail-on` / `fail-on-pillars` — block on real risk while best-practice advice stays advisory. Requires `cdk-insights >= 1.43.0`; older CLIs emit no class data, so the gate is a no-op. | No | (off) |
 | `pr-comment` | Post analysis summary as a PR comment (uses the `gh` CLI, authenticated via the workflow's `GITHUB_TOKEN`). | No | `true` |
 | `sarif-upload` | Generate SARIF and auto-upload to GitHub Code Scanning. Requires `security-events: write`. | No | `false` |
 | `upload-artifact` | Upload JSON, SARIF, and markdown report files as a workflow artifact. | No | `true` |
@@ -74,7 +77,7 @@ jobs:
 | `sarif-file` | Comma-separated paths to generated SARIF file(s) |
 | `json-file` | Comma-separated paths to JSON results file(s) |
 | `artifact-id` | ID of the uploaded artifact (omitted if `upload-artifact: false`) |
-| `exit-code` | `1` if any finding within `fail-on-pillars` matches `fail-on`; otherwise `0` |
+| `exit-code` | `1` if any finding within `fail-on-pillars` matches `fail-on`, or any finding matches `fail-on-class`; otherwise `0` |
 
 > Severity outputs always reflect **full totals** so PR comments and downstream badges never hide findings. The fail-on gate uses pillar-filtered counts internally.
 

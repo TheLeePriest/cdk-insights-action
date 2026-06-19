@@ -14,6 +14,13 @@ export type PillarKey =
   | 'performance efficiency'
   | 'sustainability';
 
+/**
+ * Finding-class axis emitted by the CLI on each issue (>= 1.43.0). Orthogonal
+ * to severity and pillar: lets teams block on real risk (`security` /
+ * `compliance`) while treating `best-practice` advice as non-blocking.
+ */
+export type FindingClassKey = 'security' | 'best-practice' | 'compliance';
+
 export interface ActionInputs {
   licenseKey: string;
   workingDirectory: string;
@@ -30,6 +37,12 @@ export interface ActionInputs {
    * Accepts `'all'` as a shorthand for every pillar.
    */
   failOnPillars: PillarKey[] | 'all';
+  /**
+   * Finding classes that fail the build regardless of severity or pillar.
+   * Empty by default (gate off). E.g. `['security', 'compliance']` blocks on
+   * real risk while best-practice advice stays non-blocking.
+   */
+  failOnClass: FindingClassKey[];
   prComment: boolean;
   sarifUpload: boolean;
   uploadArtifact: boolean;
@@ -59,10 +72,14 @@ const SAFE_VERSION_PATTERN = /^(latest|\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?)$/;
 function validateInput(value: string, pattern: RegExp, label: string): void {
   if (!value) return;
   if (value.startsWith('-')) {
-    throw new Error(`Invalid ${label}: "${value}" must not start with a hyphen`);
+    throw new Error(
+      `Invalid ${label}: "${value}" must not start with a hyphen`,
+    );
   }
   if (!pattern.test(value)) {
-    throw new Error(`Invalid ${label}: "${value}" contains disallowed characters`);
+    throw new Error(
+      `Invalid ${label}: "${value}" contains disallowed characters`,
+    );
   }
 }
 
@@ -73,7 +90,9 @@ function validateWorkingDirectory(dir: string): void {
   const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
   const resolved = path.resolve(workspace, dir);
   if (!resolved.startsWith(workspace)) {
-    throw new Error(`Invalid working-directory: "${dir}" resolves outside the workspace`);
+    throw new Error(
+      `Invalid working-directory: "${dir}" resolves outside the workspace`,
+    );
   }
 }
 
@@ -101,10 +120,12 @@ export function parseInputs(): ActionInputs {
   // Parse comma-separated lists
   const failOnInput = core.getInput('fail-on');
   const failOn = failOnInput
-    ? failOnInput.split(',').map(s => s.trim().toLowerCase())
+    ? failOnInput.split(',').map((s) => s.trim().toLowerCase())
     : [];
 
-  const failOnPillarsInput = (core.getInput('fail-on-pillars') || 'security').trim().toLowerCase();
+  const failOnPillarsInput = (core.getInput('fail-on-pillars') || 'security')
+    .trim()
+    .toLowerCase();
   const knownPillars: PillarKey[] = [
     'security',
     'reliability',
@@ -115,7 +136,10 @@ export function parseInputs(): ActionInputs {
   ];
   const parseFailOnPillars = (raw: string): PillarKey[] | 'all' => {
     if (raw === 'all') return 'all';
-    const entries = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    const entries = raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
     const out: PillarKey[] = [];
     for (const entry of entries) {
       if ((knownPillars as string[]).includes(entry)) {
@@ -130,14 +154,40 @@ export function parseInputs(): ActionInputs {
   };
   const failOnPillars = parseFailOnPillars(failOnPillarsInput);
 
+  const failOnClassInput = core.getInput('fail-on-class');
+  const knownClasses: FindingClassKey[] = [
+    'security',
+    'best-practice',
+    'compliance',
+  ];
+  const failOnClass: FindingClassKey[] = failOnClassInput
+    ? failOnClassInput
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean)
+        .filter((entry): entry is FindingClassKey => {
+          if ((knownClasses as string[]).includes(entry)) return true;
+          core.warning(
+            `Unknown fail-on-class value "${entry}" — valid values: ${knownClasses.join(', ')}.`,
+          );
+          return false;
+        })
+    : [];
+
   const servicesInput = core.getInput('services');
   const services = servicesInput
-    ? servicesInput.split(',').map(s => s.trim()).filter(s => s.length > 0)
+    ? servicesInput
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
     : [];
 
   const ruleFilterInput = core.getInput('rule-filter');
   const ruleFilter = ruleFilterInput
-    ? ruleFilterInput.split(',').map(s => s.trim()).filter(s => s.length > 0)
+    ? ruleFilterInput
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
     : [];
 
   // --- Input validation ---
@@ -156,7 +206,11 @@ export function parseInputs(): ActionInputs {
   }
 
   // Validate version (prevents command injection via crafted version strings)
-  validateInput(cdkInsightsVersion, SAFE_VERSION_PATTERN, 'cdk-insights-version');
+  validateInput(
+    cdkInsightsVersion,
+    SAFE_VERSION_PATTERN,
+    'cdk-insights-version',
+  );
 
   // Validate working directory (prevents path traversal)
   validateWorkingDirectory(workingDirectory);
@@ -165,7 +219,9 @@ export function parseInputs(): ActionInputs {
   const validSeverities = ['critical', 'high', 'medium', 'low'];
   for (const severity of failOn) {
     if (!validSeverities.includes(severity)) {
-      core.warning(`Invalid severity in fail-on: ${severity}. Valid values: ${validSeverities.join(', ')}`);
+      core.warning(
+        `Invalid severity in fail-on: ${severity}. Valid values: ${validSeverities.join(', ')}`,
+      );
     }
   }
 
@@ -182,7 +238,12 @@ export function parseInputs(): ActionInputs {
     core.info(`  Artifact Name: ${artifactName}`);
   }
   core.info(`  Fail On: ${failOn.length > 0 ? failOn.join(', ') : '(none)'}`);
-  core.info(`  Fail On Pillars: ${failOnPillars === 'all' ? 'all' : failOnPillars.join(', ')}`);
+  core.info(
+    `  Fail On Pillars: ${failOnPillars === 'all' ? 'all' : failOnPillars.join(', ')}`,
+  );
+  core.info(
+    `  Fail On Class: ${failOnClass.length > 0 ? failOnClass.join(', ') : '(none)'}`,
+  );
   if (services.length > 0) {
     core.info(`  Services: ${services.join(', ')}`);
   }
@@ -198,6 +259,7 @@ export function parseInputs(): ActionInputs {
     aiAnalysis,
     failOn,
     failOnPillars,
+    failOnClass,
     prComment,
     sarifUpload,
     uploadArtifact,

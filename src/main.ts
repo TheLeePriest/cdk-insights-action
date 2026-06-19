@@ -5,12 +5,17 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { parseInputs } from './inputs';
 import { aggregateResults, setOutputs } from './outputs';
-import { buildScanArgs, buildSarifArgs } from './args';
+import { buildScanArgs, buildSarifArgs, ExtraReportFormat } from './args';
 import { uploadSarifToCodeScanning } from './sarif-upload';
 import { uploadReportArtifacts } from './artifact-upload';
+import {
+  REPORT_SUFFIX,
+  REPORTS_FLAG_MIN_VERSION,
+  selectSarifFiles,
+  versionGte,
+} from './report-utils';
 
 const TOOL_NAME = 'cdk-insights';
-const REPORT_SUFFIX = '_analysis_report';
 
 /**
  * Resolve the version string to install.
@@ -20,14 +25,24 @@ async function resolveVersion(version: string): Promise<string> {
   if (version !== 'latest') return version;
 
   let stdout = '';
-  await exec.exec('npm', ['view', 'cdk-insights', 'version', '--registry', 'https://registry.npmjs.org'], {
-    silent: true,
-    listeners: {
-      stdout: (data: Buffer) => {
-        stdout += data.toString();
+  await exec.exec(
+    'npm',
+    [
+      'view',
+      'cdk-insights',
+      'version',
+      '--registry',
+      'https://registry.npmjs.org',
+    ],
+    {
+      silent: true,
+      listeners: {
+        stdout: (data: Buffer) => {
+          stdout += data.toString();
+        },
       },
     },
-  });
+  );
 
   return stdout.trim();
 }
@@ -35,8 +50,9 @@ async function resolveVersion(version: string): Promise<string> {
 /**
  * Install cdk-insights CLI with tool caching.
  * On first run: installs via npm and caches. On subsequent runs: restores from cache.
+ * Returns the resolved (numeric) version so the caller can gate features.
  */
-async function installCdkInsights(requestedVersion: string): Promise<void> {
+async function installCdkInsights(requestedVersion: string): Promise<string> {
   const version = await resolveVersion(requestedVersion);
   core.info(`Resolved cdk-insights version: ${version}`);
 
@@ -45,28 +61,39 @@ async function installCdkInsights(requestedVersion: string): Promise<void> {
   if (cachedPath) {
     core.info(`Using cached cdk-insights ${version}`);
     core.addPath(path.join(cachedPath, 'bin'));
-    return;
+    return version;
   }
 
   // Not cached — install to a temp directory and cache it
   core.info(`Installing cdk-insights@${version}...`);
-  const installDir = path.join(process.env.RUNNER_TEMP || '/tmp', `cdk-insights-${version}`);
+  const installDir = path.join(
+    process.env.RUNNER_TEMP || '/tmp',
+    `cdk-insights-${version}`,
+  );
   fs.mkdirSync(installDir, { recursive: true });
 
-  await exec.exec('npm', [
-    'install',
-    '--prefix', installDir,
-    '--registry', 'https://registry.npmjs.org',
-    `cdk-insights@${version}`,
-  ], {
-    silent: false,
-  });
+  await exec.exec(
+    'npm',
+    [
+      'install',
+      '--prefix',
+      installDir,
+      '--registry',
+      'https://registry.npmjs.org',
+      `cdk-insights@${version}`,
+    ],
+    {
+      silent: false,
+    },
+  );
 
   // The binary is at installDir/node_modules/.bin/cdk-insights
   const binDir = path.join(installDir, 'node_modules', '.bin');
   const cdkInsightsPath = path.join(binDir, 'cdk-insights');
   if (!fs.existsSync(cdkInsightsPath)) {
-    throw new Error('cdk-insights installation failed - binary not found after npm install');
+    throw new Error(
+      'cdk-insights installation failed - binary not found after npm install',
+    );
   }
 
   // Cache the install directory for future runs
@@ -74,12 +101,13 @@ async function installCdkInsights(requestedVersion: string): Promise<void> {
   core.addPath(path.join(cached, 'node_modules', '.bin'));
 
   core.info(`cdk-insights ${version} installed and cached`);
+  return version;
 }
 
 async function runAnalysis(
   args: string[],
   workingDirectory: string,
-  licenseKey: string
+  licenseKey: string,
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   let stdout = '';
   let stderr = '';
@@ -143,9 +171,10 @@ async function runAnalysis(
 function findReportFiles(dir: string, ext: string): string[] {
   if (!fs.existsSync(dir)) return [];
   const suffix = `${REPORT_SUFFIX}.${ext}`;
-  return fs.readdirSync(dir)
-    .filter(f => f.endsWith(suffix))
-    .map(f => path.join(dir, f));
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith(suffix))
+    .map((f) => path.join(dir, f));
 }
 
 async function run(): Promise<void> {
@@ -153,15 +182,33 @@ async function run(): Promise<void> {
     const inputs = parseInputs();
 
     core.startGroup('Setup');
-    await installCdkInsights(inputs.cdkInsightsVersion);
+    const resolvedVersion = await installCdkInsights(inputs.cdkInsightsVersion);
     core.endGroup();
 
     // Warn if AI requested without license
     if (inputs.aiAnalysis && !inputs.licenseKey) {
-      core.warning('AI analysis requested but no license key provided - using static analysis only');
+      core.warning(
+        'AI analysis requested but no license key provided - using static analysis only',
+      );
     }
 
-    const args = buildScanArgs(inputs);
+    // CLI >= 1.44.0 writes every requested report file in a single pass via
+    // --reports. Older CLIs need a separate scan per format, so SARIF falls
+    // back to a second run and markdown can't be produced at all.
+    const supportsReports = versionGte(
+      resolvedVersion,
+      REPORTS_FLAG_MIN_VERSION,
+    );
+
+    // Extra report files to request in the single pass: SARIF only when we'll
+    // upload it, markdown only when it'll be kept as an artifact.
+    const extraReports: ExtraReportFormat[] = [];
+    if (supportsReports) {
+      if (inputs.sarifUpload) extraReports.push('sarif');
+      if (inputs.uploadArtifact) extraReports.push('markdown');
+    }
+
+    const args = buildScanArgs(inputs, extraReports);
 
     core.startGroup('Running CDK Insights Analysis');
     core.info(`Command: cdk-insights ${args.join(' ')}`);
@@ -169,7 +216,7 @@ async function run(): Promise<void> {
     const { exitCode, stdout, stderr } = await runAnalysis(
       args,
       inputs.workingDirectory,
-      inputs.licenseKey
+      inputs.licenseKey,
     );
 
     if (stdout) {
@@ -185,14 +232,19 @@ async function run(): Promise<void> {
 
     // Distinguish CLI crash from normal analysis results
     if (exitCode !== 0 && jsonFiles.length === 0) {
-      const errorMsg = stderr.trim() || stdout.trim() || `cdk-insights exited with code ${exitCode}`;
+      const errorMsg =
+        stderr.trim() ||
+        stdout.trim() ||
+        `cdk-insights exited with code ${exitCode}`;
       throw new Error(`CDK Insights CLI failed: ${errorMsg}`);
     }
 
     if (jsonFiles.length === 0) {
       core.warning('No analysis report files found');
     } else {
-      core.info(`Found ${jsonFiles.length} report file(s): ${jsonFiles.join(', ')}`);
+      core.info(
+        `Found ${jsonFiles.length} report file(s): ${jsonFiles.join(', ')}`,
+      );
     }
 
     // Parse and aggregate results from all report files. Counts split
@@ -202,21 +254,49 @@ async function run(): Promise<void> {
     core.startGroup('Processing Results');
     const results = aggregateResults(jsonFiles, inputs.failOnPillars);
 
-    // Generate SARIF file if requested
+    // Resolve SARIF files if requested. In single-pass mode the CLI already
+    // wrote them in the run above; on older CLIs we do a dedicated SARIF pass.
+    // Either way, selectSarifFiles collapses the per-stack + consolidated set
+    // to a single non-duplicating upload.
     let sarifFiles: string[] = [];
     if (inputs.sarifUpload) {
-      core.info('Generating SARIF output...');
-
-      const sarifArgs = buildSarifArgs(inputs);
-      const sarifResult = await runAnalysis(sarifArgs, inputs.workingDirectory, inputs.licenseKey);
-
-      sarifFiles = findReportFiles(inputs.workingDirectory, 'sarif');
-      if (sarifResult.exitCode !== 0 && sarifFiles.length === 0) {
-        core.warning(`SARIF generation failed: ${sarifResult.stderr.trim() || `exit code ${sarifResult.exitCode}`}`);
-      } else if (sarifFiles.length > 0) {
-        core.info(`SARIF file(s) generated: ${sarifFiles.join(', ')}`);
+      if (supportsReports) {
+        sarifFiles = selectSarifFiles(
+          findReportFiles(inputs.workingDirectory, 'sarif'),
+        );
+        if (sarifFiles.length > 0) {
+          core.info(`SARIF file(s) generated: ${sarifFiles.join(', ')}`);
+        } else {
+          core.warning(
+            'SARIF upload requested but no SARIF files were produced',
+          );
+        }
       } else {
-        core.warning('SARIF generation requested but no SARIF files were produced');
+        core.info(
+          'Generating SARIF output (second pass — cdk-insights < 1.44.0)...',
+        );
+
+        const sarifArgs = buildSarifArgs(inputs);
+        const sarifResult = await runAnalysis(
+          sarifArgs,
+          inputs.workingDirectory,
+          inputs.licenseKey,
+        );
+
+        sarifFiles = selectSarifFiles(
+          findReportFiles(inputs.workingDirectory, 'sarif'),
+        );
+        if (sarifResult.exitCode !== 0 && sarifFiles.length === 0) {
+          core.warning(
+            `SARIF generation failed: ${sarifResult.stderr.trim() || `exit code ${sarifResult.exitCode}`}`,
+          );
+        } else if (sarifFiles.length > 0) {
+          core.info(`SARIF file(s) generated: ${sarifFiles.join(', ')}`);
+        } else {
+          core.warning(
+            'SARIF generation requested but no SARIF files were produced',
+          );
+        }
       }
     }
 
@@ -233,21 +313,36 @@ async function run(): Promise<void> {
       core.startGroup('Uploading Report Artifacts');
       const markdownFiles = findReportFiles(inputs.workingDirectory, 'md');
       const allReportFiles = [...jsonFiles, ...sarifFiles, ...markdownFiles];
-      artifactId = await uploadReportArtifacts(allReportFiles, inputs.artifactName, inputs.workingDirectory);
+      artifactId = await uploadReportArtifacts(
+        allReportFiles,
+        inputs.artifactName,
+        inputs.workingDirectory,
+      );
       core.endGroup();
     }
 
-    setOutputs(results, jsonFiles, inputs.failOn, sarifFiles, artifactId);
+    setOutputs(
+      results,
+      jsonFiles,
+      inputs.failOn,
+      inputs.failOnClass,
+      sarifFiles,
+      artifactId,
+    );
     core.endGroup();
 
-    // Check fail conditions. The counts used here are already
+    // Check fail conditions. The severity counts used here are already
     // pillar-scoped (see aggregateResults) so e.g. a Reliability
     // CRITICAL never triggers a failure under the default
     // fail-on-pillars: security.
-    const pillarScope = inputs.failOnPillars === 'all'
-      ? 'all pillars'
-      : inputs.failOnPillars.join(', ');
+    const pillarScope =
+      inputs.failOnPillars === 'all'
+        ? 'all pillars'
+        : inputs.failOnPillars.join(', ');
 
+    const failReasons: string[] = [];
+
+    // Severity gate (pillar-scoped) — only when fail-on is configured.
     if (inputs.failOn.length > 0) {
       const failConditions: string[] = [];
       const gating = results.gatingCounts;
@@ -266,11 +361,28 @@ async function run(): Promise<void> {
       }
 
       if (failConditions.length > 0) {
-        core.setFailed(
-          `Analysis found issues at configured severity levels (${pillarScope}): ${failConditions.join(', ')}`,
+        failReasons.push(
+          `severity (${pillarScope}): ${failConditions.join(', ')}`,
         );
-        return;
       }
+    }
+
+    // Finding-class gate — orthogonal to severity and pillar. Blocks on real
+    // risk (security/compliance) while best-practice advice can stay advisory.
+    if (inputs.failOnClass.length > 0) {
+      const classHits = inputs.failOnClass
+        .filter((c) => (results.classCounts[c] ?? 0) > 0)
+        .map((c) => `${results.classCounts[c]} ${c}`);
+      if (classHits.length > 0) {
+        failReasons.push(`finding class: ${classHits.join(', ')}`);
+      }
+    }
+
+    if (failReasons.length > 0) {
+      core.setFailed(
+        `Analysis found blocking issues — ${failReasons.join('; ')}`,
+      );
+      return;
     }
 
     // Success summary
@@ -285,7 +397,9 @@ async function run(): Promise<void> {
     core.info(`  Medium: ${totals.mediumCount}`);
     core.info(`  Low: ${totals.lowCount}`);
     core.info(`Fail-on pillars: ${pillarScope}`);
-
+    if (inputs.failOnClass.length > 0) {
+      core.info(`Fail-on classes: ${inputs.failOnClass.join(', ')}`);
+    }
   } catch (error) {
     if (error instanceof Error) {
       core.setFailed(error.message);
