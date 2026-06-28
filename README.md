@@ -6,6 +6,12 @@
 
 # CDK Insights GitHub Action
 
+<p align="center">
+  <a href="https://github.com/marketplace/actions/cdk-insights"><img src="https://img.shields.io/github/v/release/instancelabs/cdk-insights-action?sort=semver&label=marketplace&color=5da38a&logo=github" alt="GitHub Marketplace version"></a>
+  <a href="https://github.com/instancelabs/cdk-insights-action/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/instancelabs/cdk-insights-action/ci.yml?branch=main&label=CI&color=5da38a" alt="CI status"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/instancelabs/cdk-insights-action?color=5da38a" alt="MIT license"></a>
+</p>
+
 Static and AI-powered analysis for AWS CDK — runs `cdk-insights scan` against your synthesized stacks and surfaces findings as PR comments, GitHub Code Scanning alerts, and downloadable reports.
 
 > **Requires `cdk-insights` >= 1.44.1.** The CLI is installed automatically (`latest` by default), so no action is needed unless you pin an older version via `cdk-insights-version`. On older CLIs the action still runs but with reduced functionality — single-pass reports, the `fail-on-class` gate, and `stack-name` scoping all depend on 1.44.1+.
