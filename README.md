@@ -1,3 +1,9 @@
+<p align="center">
+  <a href="https://cdkinsights.dev/?utm_source=github-action&utm_medium=readme&utm_campaign=marketplace">
+    <img src="assets/cdk-insights-banner.png" alt="CDK Insights — static and AI-powered analysis for AWS CDK" width="720">
+  </a>
+</p>
+
 # CDK Insights GitHub Action
 
 Static and AI-powered analysis for AWS CDK — runs `cdk-insights scan` against your synthesized stacks and surfaces findings as PR comments, GitHub Code Scanning alerts, and downloadable reports.
