@@ -1,15 +1,13 @@
 <p align="center">
   <a href="https://cdkinsights.dev/?utm_source=github-action&utm_medium=readme&utm_campaign=marketplace">
-    <img src="assets/cdk-insights-banner.png" alt="CDK Insights — static and AI-powered analysis for AWS CDK" width="720">
+    <img src="assets/cdk-insights-banner.png" alt="CDK Insights — static and AI-powered analysis for AWS CDK" width="100%">
   </a>
 </p>
 
 # CDK Insights GitHub Action
 
 <p align="center">
-  <a href="https://github.com/marketplace/actions/cdk-insights"><img src="https://img.shields.io/github/v/release/instancelabs/cdk-insights-action?sort=semver&label=marketplace&color=5da38a&logo=github" alt="GitHub Marketplace version"></a>
-  <a href="https://github.com/instancelabs/cdk-insights-action/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/instancelabs/cdk-insights-action/ci.yml?branch=main&label=CI&color=5da38a" alt="CI status"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/github/license/instancelabs/cdk-insights-action?color=5da38a" alt="MIT license"></a>
+  <a href="https://github.com/marketplace/actions/cdk-insights"><img src="https://img.shields.io/github/v/release/instancelabs/cdk-insights-action?sort=semver&label=marketplace&color=5da38a&logo=github" alt="GitHub Marketplace version"></a>&nbsp;<a href="https://github.com/instancelabs/cdk-insights-action/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/instancelabs/cdk-insights-action/ci.yml?branch=main&label=CI&color=5da38a" alt="CI status"></a>&nbsp;<a href="./LICENSE"><img src="https://img.shields.io/github/license/instancelabs/cdk-insights-action?color=5da38a" alt="MIT license"></a>
 </p>
 
 Static and AI-powered analysis for AWS CDK — runs `cdk-insights scan` against your synthesized stacks and surfaces findings as PR comments, GitHub Code Scanning alerts, and downloadable reports.
