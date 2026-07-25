@@ -31,7 +31,7 @@ export interface ActionInputs {
    * Which WAF pillars count toward the fail-on thresholds. Reliability,
    * Cost, and Best-Practice findings are surfaced in the report but
    * don't block the deploy unless the user opts in. Default is
-   * `['security']` — matches how other scanners (Snyk, SonarQube,
+   * `['security']` - matches how other scanners (Snyk, SonarQube,
    * Trivy) separate "found something" from "fail the build".
    *
    * Accepts `'all'` as a shorthand for every pillar.
@@ -146,7 +146,7 @@ export function parseInputs(): ActionInputs {
         out.push(entry as PillarKey);
       } else {
         core.warning(
-          `Unknown fail-on-pillars value "${entry}" — valid values: ${knownPillars.join(', ')}, or "all".`,
+          `Unknown fail-on-pillars value "${entry}" - valid values: ${knownPillars.join(', ')}, or "all".`,
         );
       }
     }
@@ -168,7 +168,7 @@ export function parseInputs(): ActionInputs {
         .filter((entry): entry is FindingClassKey => {
           if ((knownClasses as string[]).includes(entry)) return true;
           core.warning(
-            `Unknown fail-on-class value "${entry}" — valid values: ${knownClasses.join(', ')}.`,
+            `Unknown fail-on-class value "${entry}" - valid values: ${knownClasses.join(', ')}.`,
           );
           return false;
         })

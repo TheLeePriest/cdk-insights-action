@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://cdkinsights.dev/?utm_source=github-action&utm_medium=readme&utm_campaign=marketplace">
-    <img src="assets/cdk-insights-banner.png" alt="CDK Insights — static and AI-powered analysis for AWS CDK" width="100%">
+    <img src="assets/cdk-insights-banner.png" alt="CDK Insights - static and AI-powered analysis for AWS CDK" width="100%">
   </a>
 </p>
 
@@ -10,21 +10,21 @@
   <a href="https://github.com/marketplace/actions/cdk-insights"><img src="https://img.shields.io/github/v/release/instancelabs/cdk-insights-action?sort=semver&label=marketplace&color=5da38a&logo=github" alt="GitHub Marketplace version"></a>&nbsp;<a href="https://github.com/instancelabs/cdk-insights-action/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/instancelabs/cdk-insights-action/ci.yml?branch=main&label=CI&color=5da38a" alt="CI status"></a>&nbsp;<a href="./LICENSE"><img src="https://img.shields.io/github/license/instancelabs/cdk-insights-action?color=5da38a" alt="MIT license"></a>
 </p>
 
-Static and AI-powered analysis for AWS CDK — runs `cdk-insights scan` against your synthesized stacks and surfaces findings as PR comments, GitHub Code Scanning alerts, and downloadable reports.
+Static and AI-powered analysis for AWS CDK - runs `cdk-insights scan` against your synthesized stacks and surfaces findings as PR comments, GitHub Code Scanning alerts, and downloadable reports.
 
-> **Requires `cdk-insights` >= 1.44.1.** The CLI is installed automatically (`latest` by default), so no action is needed unless you pin an older version via `cdk-insights-version`. On older CLIs the action still runs but with reduced functionality — single-pass reports, the `fail-on-class` gate, and `stack-name` scoping all depend on 1.44.1+.
+> **Requires `cdk-insights` >= 1.44.1.** The CLI is installed automatically (`latest` by default), so no action is needed unless you pin an older version via `cdk-insights-version`. On older CLIs the action still runs but with reduced functionality - single-pass reports, the `fail-on-class` gate, and `stack-name` scoping all depend on 1.44.1+.
 
 ## Features
 
-- **100+ rules across 35+ AWS services** — security misconfigurations, cost waste, reliability gaps, and Well-Architected Framework pillar violations
-- **AI-powered recommendations** — context-aware analysis via AWS Bedrock (requires a CDK Insights account; 500 free credits/month or paid tier)
-- **PR comments** — severity-bucketed summary posted on pull requests via `gh` CLI
-- **GitHub Code Scanning** — SARIF generated and auto-uploaded to the Security tab
-- **Report artifacts** — JSON, SARIF, and markdown reports persisted as downloadable workflow artifacts
-- **Per-pillar fail gating** — fail the build on Security findings only (default), or opt into Reliability / Cost / etc.
-- **Per-class fail gating** — block on `security` / `compliance` findings while best-practice advice stays advisory, independent of severity (`fail-on-class`)
-- **Single-pass reports** — with `cdk-insights >= 1.44.1` the JSON, SARIF, and Markdown reports are produced from one scan (no duplicate analysis or scan-history upload)
-- **CLI caching** — the `cdk-insights` npm package is cached via `@actions/tool-cache`, so subsequent runs skip the install step
+- **100+ rules across 35+ AWS services** - security misconfigurations, cost waste, reliability gaps, and Well-Architected Framework pillar violations
+- **AI-powered recommendations** - context-aware analysis via AWS Bedrock (requires a CDK Insights account; 500 free credits/month or paid tier)
+- **PR comments** - severity-bucketed summary posted on pull requests via `gh` CLI
+- **GitHub Code Scanning** - SARIF generated and auto-uploaded to the Security tab
+- **Report artifacts** - JSON, SARIF, and markdown reports persisted as downloadable workflow artifacts
+- **Per-pillar fail gating** - fail the build on Security findings only (default), or opt into Reliability / Cost / etc.
+- **Per-class fail gating** - block on `security` / `compliance` findings while best-practice advice stays advisory, independent of severity (`fail-on-class`)
+- **Single-pass reports** - with `cdk-insights >= 1.44.1` the JSON, SARIF, and Markdown reports are produced from one scan (no duplicate analysis or scan-history upload)
+- **CLI caching** - the `cdk-insights` npm package is cached via `@actions/tool-cache`, so subsequent runs skip the install step
 
 ## Quick Start
 
@@ -61,13 +61,13 @@ jobs:
 
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
-| `license-key` | CDK Insights license key. Required for AI analysis. Free, Pro, and Team license keys are all supported — quotas are enforced server-side. | No | - |
+| `license-key` | CDK Insights license key. Required for AI analysis. Free, Pro, and Team license keys are all supported - quotas are enforced server-side. | No | - |
 | `working-directory` | Directory containing the CDK project (validated to stay inside `GITHUB_WORKSPACE`). | No | `.` |
 | `stack-name` | Specific stack to analyze. Omit to analyze every stack (`--all`). | No | (all stacks) |
 | `ai-analysis` | Enable AI-powered recommendations. Requires `license-key`. Set to `false` with a license key to pass `--local` and force static-only analysis. | No | `false` |
 | `fail-on` | Fail workflow on severity levels (comma-separated: `critical,high,medium,low`). Omit to fail on any finding within `fail-on-pillars` scope. | No | - |
 | `fail-on-pillars` | Which Well-Architected pillars count toward `fail-on`. Comma-separated list of `security`, `reliability`, `cost optimization`, `operational excellence`, `performance efficiency`, `sustainability`, or the shorthand `all`. Findings from other pillars are still reported but won't block the deploy. | No | `security` |
-| `fail-on-class` | Fail the build on findings of these **classes**, regardless of severity or pillar. Comma-separated list of `security`, `best-practice`, `compliance`. Orthogonal to `fail-on` / `fail-on-pillars` — block on real risk while best-practice advice stays advisory. Requires `cdk-insights >= 1.44.1`; older CLIs emit no class data, so the gate is a no-op. | No | (off) |
+| `fail-on-class` | Fail the build on findings of these **classes**, regardless of severity or pillar. Comma-separated list of `security`, `best-practice`, `compliance`. Orthogonal to `fail-on` / `fail-on-pillars` - block on real risk while best-practice advice stays advisory. Requires `cdk-insights >= 1.44.1`; older CLIs emit no class data, so the gate is a no-op. | No | (off) |
 | `pr-comment` | Post analysis summary as a PR comment (uses the `gh` CLI, authenticated via the workflow's `GITHUB_TOKEN`). | No | `true` |
 | `sarif-upload` | Generate SARIF and auto-upload to GitHub Code Scanning. Requires `security-events: write`. | No | `false` |
 | `upload-artifact` | Upload JSON, SARIF, and markdown report files as a workflow artifact. | No | `true` |
@@ -82,7 +82,7 @@ jobs:
 | Output | Description |
 |--------|-------------|
 | `total-issues` | Total number of issues found across every pillar |
-| `critical-count` | Number of critical issues (full totals — not pillar-filtered) |
+| `critical-count` | Number of critical issues (full totals - not pillar-filtered) |
 | `high-count` | Number of high severity issues |
 | `medium-count` | Number of medium severity issues |
 | `low-count` | Number of low severity issues |
@@ -97,7 +97,7 @@ jobs:
 
 ### Static Analysis (No License)
 
-100+ rules with PR comments — no signup required:
+100+ rules with PR comments - no signup required:
 
 ```yaml
 - uses: instancelabs/cdk-insights-action@v1
@@ -105,7 +105,7 @@ jobs:
 
 ### AI-Powered Analysis
 
-Enable Bedrock-backed recommendations. Works on any tier with a license key — Free accounts get 500 AI insights/month, Pro gets 5,000/month, Team gets 10,000 per seat:
+Enable Bedrock-backed recommendations. Works on any tier with a license key - Free accounts get 500 AI insights/month, Pro gets 5,000/month, Team gets 10,000 per seat:
 
 ```yaml
 - uses: instancelabs/cdk-insights-action@v1
@@ -170,7 +170,7 @@ Analyze only a specific CDK stack:
 
 ### GitHub Code Scanning (SARIF)
 
-When `sarif-upload: true`, the action automatically generates SARIF files and uploads them to GitHub's Security tab — no extra steps needed:
+When `sarif-upload: true`, the action automatically generates SARIF files and uploads them to GitHub's Security tab - no extra steps needed:
 
 ```yaml
 jobs:
@@ -340,7 +340,7 @@ permissions:
 
 ## Environment Variables
 
-The full workflow environment is forwarded to the `cdk-insights` CLI subprocess, so anything a `cdk synth` needs at runtime — AWS credentials, region, project config — works out of the box:
+The full workflow environment is forwarded to the `cdk-insights` CLI subprocess, so anything a `cdk synth` needs at runtime - AWS credentials, region, project config - works out of the box:
 
 - `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` (for SDK lookups during synth)
 - `CDK_DEFAULT_ACCOUNT`, `CDK_DEFAULT_REGION` (for environment-targeted stacks)
@@ -348,7 +348,7 @@ The full workflow environment is forwarded to the `cdk-insights` CLI subprocess,
 
 The action sets `CI=true` and `CDK_INSIGHTS_LICENSE_KEY` (when `license-key` is provided) on top of the inherited env. License keys are masked via `core.setSecret()` so they never appear in logs.
 
-If your CDK app needs AWS credentials at synth time, configure them with [`aws-actions/configure-aws-credentials`](https://github.com/aws-actions/configure-aws-credentials) before this action — ideally via OIDC, not long-lived keys.
+If your CDK app needs AWS credentials at synth time, configure them with [`aws-actions/configure-aws-credentials`](https://github.com/aws-actions/configure-aws-credentials) before this action - ideally via OIDC, not long-lived keys.
 
 ## PR Comment Example
 
@@ -388,7 +388,7 @@ When `pr-comment: true` (default), the action posts a summary like:
 | **Pro** | £9.99/mo | Everything in Free + full AI analysis (Bedrock), dashboard, PDF reports, **5,000 AI insights/month** |
 | **Team** | £12.99/seat/mo (2-seat minimum) | Everything in Pro + team management, shared configs, audit trails, **10,000 AI insights per seat** |
 
-Static analysis is **free forever** — no signup, no credit card. AI analysis requires a license key (free account or paid). Usage beyond the included monthly insights is billed per-credit on Pro/Team.
+Static analysis is **free forever** - no signup, no credit card. AI analysis requires a license key (free account or paid). Usage beyond the included monthly insights is billed per-credit on Pro/Team.
 
 [View full pricing at cdkinsights.dev](https://cdkinsights.dev/pricing)
 

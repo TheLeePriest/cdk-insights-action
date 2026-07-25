@@ -13,7 +13,7 @@ export interface SeverityCounts {
 
 export interface AnalysisResults {
   totalIssues: number;
-  /** Counts across every issue in the report — used for user-facing output. */
+  /** Counts across every issue in the report - used for user-facing output. */
   totalCounts: SeverityCounts;
   /**
    * Counts restricted to the pillars in `failOnPillars`. Used for exit-code
@@ -38,7 +38,7 @@ interface Issue {
   issue: string;
   recommendation?: string;
   wafPillar?: string;
-  /** Finding class axis (security | best-practice | compliance) — CLI >= 1.43.0. */
+  /** Finding class axis (security | best-practice | compliance) - CLI >= 1.43.0. */
   findingClass?: string;
   foundBy?: string;
 }
@@ -111,7 +111,7 @@ const matchesFailOnPillar = (
  * re-walk `recommendations[].issues[]` rather than trusting the
  * summary totals. When a report has no recommendations array (older
  * CLI) we fall back to the summary view but gating defaults to match
- * totals — safest over-report. The `summary.totalIssues` value is
+ * totals - safest over-report. The `summary.totalIssues` value is
  * still used for display in aggregate.
  */
 export function parseResults(
@@ -182,7 +182,7 @@ export function parseResults(
         totalCounts: summaryCounts,
         gatingCounts: summaryCounts,
         // Summary-only reports carry no per-issue class data, so the
-        // class gate can't fire on them (fails open — never blocks).
+        // class gate can't fire on them (fails open - never blocks).
         classCounts: {},
         resourceCount: report.summary.totalResources ?? 0,
       };
@@ -234,7 +234,7 @@ export function aggregateResults(
  *
  * Outputs reflect the full view so badges / PR comments never hide
  * findings, but the fail-on exit code is computed strictly from
- * `gatingCounts` — findings whose pillar is in the user's
+ * `gatingCounts` - findings whose pillar is in the user's
  * `fail-on-pillars` allowlist (default: security only).
  */
 export function setOutputs(
@@ -282,7 +282,7 @@ export function setOutputs(
     exitCode = totalInScope > 0 ? 1 : 0;
   }
 
-  // Finding-class gate is orthogonal to severity/pillar — fold it into the
+  // Finding-class gate is orthogonal to severity/pillar - fold it into the
   // exit code so a security/compliance finding fails even when severity
   // gating wouldn't (e.g. a MEDIUM security finding under fail-on: critical).
   if (

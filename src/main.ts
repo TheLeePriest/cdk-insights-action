@@ -58,7 +58,7 @@ async function installCdkInsights(requestedVersion: string): Promise<string> {
 
   // Check tool cache first. The cached directory is the contents of the
   // npm --prefix install dir, so the binary lives at node_modules/.bin
-  // (matching where it's added on the install path below) — NOT bin/.
+  // (matching where it's added on the install path below) - NOT bin/.
   const cachedPath = tc.find(TOOL_NAME, version);
   if (cachedPath) {
     const cachedBin = path.join(cachedPath, 'node_modules', '.bin');
@@ -68,11 +68,11 @@ async function installCdkInsights(requestedVersion: string): Promise<string> {
       return version;
     }
     core.warning(
-      `Cached cdk-insights ${version} is missing its binary — reinstalling.`,
+      `Cached cdk-insights ${version} is missing its binary - reinstalling.`,
     );
   }
 
-  // Not cached — install to a temp directory and cache it
+  // Not cached - install to a temp directory and cache it
   core.info(`Installing cdk-insights@${version}...`);
   const installDir = path.join(
     process.env.RUNNER_TEMP || '/tmp',
@@ -126,7 +126,7 @@ async function runAnalysis(
   // variables to forward (PATH, HOME, GITHUB_*, etc.). The intent was
   // defence-in-depth: stop accidental leakage of workflow secrets into
   // the CLI. In practice the allowlist blocked every env var a CDK
-  // app reads at synth time — AWS_REGION / AWS_ACCESS_KEY_ID /
+  // app reads at synth time - AWS_REGION / AWS_ACCESS_KEY_ID /
   // AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN for SDK calls,
   // CDK_DEFAULT_ACCOUNT / CDK_DEFAULT_REGION for bootstrap targeting,
   // and project-specific config vars like STAGE, STRIPE_EVENT_SOURCE_NAME,
@@ -147,7 +147,7 @@ async function runAnalysis(
       env[key] = value;
     }
   }
-  // Keep CI=true on top — GitHub sets it, but belt and braces for
+  // Keep CI=true on top - GitHub sets it, but belt and braces for
   // projects that rely on the CLI auto-detecting a CI environment.
   env.CI = 'true';
 
@@ -281,7 +281,7 @@ async function run(): Promise<void> {
         }
       } else {
         core.info(
-          'Generating SARIF output (second pass — cdk-insights < 1.44.0)...',
+          'Generating SARIF output (second pass - cdk-insights < 1.44.0)...',
         );
 
         const sarifArgs = buildSarifArgs(inputs);
@@ -350,7 +350,7 @@ async function run(): Promise<void> {
 
     const failReasons: string[] = [];
 
-    // Severity gate (pillar-scoped) — only when fail-on is configured.
+    // Severity gate (pillar-scoped) - only when fail-on is configured.
     if (inputs.failOn.length > 0) {
       const failConditions: string[] = [];
       const gating = results.gatingCounts;
@@ -375,7 +375,7 @@ async function run(): Promise<void> {
       }
     }
 
-    // Finding-class gate — orthogonal to severity and pillar. Blocks on real
+    // Finding-class gate - orthogonal to severity and pillar. Blocks on real
     // risk (security/compliance) while best-practice advice can stay advisory.
     if (inputs.failOnClass.length > 0) {
       const classHits = inputs.failOnClass
@@ -388,7 +388,7 @@ async function run(): Promise<void> {
 
     if (failReasons.length > 0) {
       core.setFailed(
-        `Analysis found blocking issues — ${failReasons.join('; ')}`,
+        `Analysis found blocking issues - ${failReasons.join('; ')}`,
       );
       return;
     }

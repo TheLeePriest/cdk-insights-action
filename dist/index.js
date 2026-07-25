@@ -33727,7 +33727,7 @@ exports.colors = [6, 2, 3, 4, 5, 1];
 try {
 	// Optional dependency (as in, doesn't need to be installed, NOT like optionalDependencies in package.json)
 	// eslint-disable-next-line import/no-extraneous-dependencies
-	const supportsColor = __nccwpck_require__(60075);
+	const supportsColor = __nccwpck_require__(82438);
 
 	if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
 		exports.colors = [
@@ -84024,6 +84024,165 @@ ZipStream.prototype.finalize = function() {
 
 /***/ }),
 
+/***/ 92745:
+/***/ ((module) => {
+
+"use strict";
+
+
+module.exports = (flag, argv = process.argv) => {
+	const prefix = flag.startsWith('-') ? '' : (flag.length === 1 ? '-' : '--');
+	const position = argv.indexOf(prefix + flag);
+	const terminatorPosition = argv.indexOf('--');
+	return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
+};
+
+
+/***/ }),
+
+/***/ 82438:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+"use strict";
+
+const os = __nccwpck_require__(70857);
+const tty = __nccwpck_require__(52018);
+const hasFlag = __nccwpck_require__(92745);
+
+const {env} = process;
+
+let forceColor;
+if (hasFlag('no-color') ||
+	hasFlag('no-colors') ||
+	hasFlag('color=false') ||
+	hasFlag('color=never')) {
+	forceColor = 0;
+} else if (hasFlag('color') ||
+	hasFlag('colors') ||
+	hasFlag('color=true') ||
+	hasFlag('color=always')) {
+	forceColor = 1;
+}
+
+if ('FORCE_COLOR' in env) {
+	if (env.FORCE_COLOR === 'true') {
+		forceColor = 1;
+	} else if (env.FORCE_COLOR === 'false') {
+		forceColor = 0;
+	} else {
+		forceColor = env.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env.FORCE_COLOR, 10), 3);
+	}
+}
+
+function translateLevel(level) {
+	if (level === 0) {
+		return false;
+	}
+
+	return {
+		level,
+		hasBasic: true,
+		has256: level >= 2,
+		has16m: level >= 3
+	};
+}
+
+function supportsColor(haveStream, streamIsTTY) {
+	if (forceColor === 0) {
+		return 0;
+	}
+
+	if (hasFlag('color=16m') ||
+		hasFlag('color=full') ||
+		hasFlag('color=truecolor')) {
+		return 3;
+	}
+
+	if (hasFlag('color=256')) {
+		return 2;
+	}
+
+	if (haveStream && !streamIsTTY && forceColor === undefined) {
+		return 0;
+	}
+
+	const min = forceColor || 0;
+
+	if (env.TERM === 'dumb') {
+		return min;
+	}
+
+	if (process.platform === 'win32') {
+		// Windows 10 build 10586 is the first Windows release that supports 256 colors.
+		// Windows 10 build 14931 is the first release that supports 16m/TrueColor.
+		const osRelease = os.release().split('.');
+		if (
+			Number(osRelease[0]) >= 10 &&
+			Number(osRelease[2]) >= 10586
+		) {
+			return Number(osRelease[2]) >= 14931 ? 3 : 2;
+		}
+
+		return 1;
+	}
+
+	if ('CI' in env) {
+		if (['TRAVIS', 'CIRCLECI', 'APPVEYOR', 'GITLAB_CI', 'GITHUB_ACTIONS', 'BUILDKITE'].some(sign => sign in env) || env.CI_NAME === 'codeship') {
+			return 1;
+		}
+
+		return min;
+	}
+
+	if ('TEAMCITY_VERSION' in env) {
+		return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env.TEAMCITY_VERSION) ? 1 : 0;
+	}
+
+	if (env.COLORTERM === 'truecolor') {
+		return 3;
+	}
+
+	if ('TERM_PROGRAM' in env) {
+		const version = parseInt((env.TERM_PROGRAM_VERSION || '').split('.')[0], 10);
+
+		switch (env.TERM_PROGRAM) {
+			case 'iTerm.app':
+				return version >= 3 ? 3 : 2;
+			case 'Apple_Terminal':
+				return 2;
+			// No default
+		}
+	}
+
+	if (/-256(color)?$/i.test(env.TERM)) {
+		return 2;
+	}
+
+	if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env.TERM)) {
+		return 1;
+	}
+
+	if ('COLORTERM' in env) {
+		return 1;
+	}
+
+	return min;
+}
+
+function getSupportLevel(stream) {
+	const level = supportsColor(stream, stream && stream.isTTY);
+	return translateLevel(level);
+}
+
+module.exports = {
+	supportsColor: getSupportLevel,
+	stdout: translateLevel(supportsColor(true, tty.isatty(1))),
+	stderr: translateLevel(supportsColor(true, tty.isatty(2)))
+};
+
+
+/***/ }),
+
 /***/ 84970:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -84039,7 +84198,7 @@ exports.buildSarifArgs = buildSarifArgs;
  * For older CLIs the caller omits them and falls back to a second `scan` run
  * built with {@link buildSarifArgs}.
  *
- * Pure function — no side effects, fully testable.
+ * Pure function - no side effects, fully testable.
  */
 function buildScanArgs(inputs, extraReports = []) {
     const args = ['scan'];
@@ -84060,11 +84219,11 @@ function buildScanArgs(inputs, extraReports = []) {
     if (inputs.prComment) {
         args.push('--prComment');
     }
-    // Services filter (yargs array type — pass as individual args)
+    // Services filter (yargs array type - pass as individual args)
     if (inputs.services.length > 0) {
         args.push('--services', ...inputs.services);
     }
-    // Rule filter (yargs array type — pass as individual args)
+    // Rule filter (yargs array type - pass as individual args)
     if (inputs.ruleFilter.length > 0) {
         args.push('--ruleFilter', ...inputs.ruleFilter);
     }
@@ -84074,13 +84233,13 @@ function buildScanArgs(inputs, extraReports = []) {
     // Single-pass extra reports (CLI >= 1.44.0). Writes the SARIF and/or
     // Markdown report files alongside the JSON one without a second scan,
     // so we don't re-synthesize, re-run AI, or upload a duplicate scan to
-    // scan history. yargs array option — pass each value as its own arg.
+    // scan history. yargs array option - pass each value as its own arg.
     if (extraReports.length > 0) {
         args.push('--reports', ...extraReports);
     }
     // Stack selection goes LAST. The `--` separator stops a flag-like stack
     // name from being parsed as an option (defence-in-depth on top of the
-    // input validation), but everything after `--` is treated as positional —
+    // input validation), but everything after `--` is treated as positional -
     // so it must come after every flag, or the flags get swallowed too.
     appendStackSelection(args, inputs);
     return args;
@@ -84117,7 +84276,7 @@ function buildSarifArgs(inputs) {
         args.push('--local');
     }
     args.push('--format', 'sarif');
-    // Stack selection last — see buildScanArgs / appendStackSelection.
+    // Stack selection last - see buildScanArgs / appendStackSelection.
     appendStackSelection(args, inputs);
     return args;
 }
@@ -84322,7 +84481,7 @@ function parseInputs() {
                 out.push(entry);
             }
             else {
-                core.warning(`Unknown fail-on-pillars value "${entry}" — valid values: ${knownPillars.join(', ')}, or "all".`);
+                core.warning(`Unknown fail-on-pillars value "${entry}" - valid values: ${knownPillars.join(', ')}, or "all".`);
             }
         }
         return out.length > 0 ? out : ['security'];
@@ -84342,7 +84501,7 @@ function parseInputs() {
             .filter((entry) => {
             if (knownClasses.includes(entry))
                 return true;
-            core.warning(`Unknown fail-on-class value "${entry}" — valid values: ${knownClasses.join(', ')}.`);
+            core.warning(`Unknown fail-on-class value "${entry}" - valid values: ${knownClasses.join(', ')}.`);
             return false;
         })
         : [];
@@ -84511,7 +84670,7 @@ async function installCdkInsights(requestedVersion) {
     core.info(`Resolved cdk-insights version: ${version}`);
     // Check tool cache first. The cached directory is the contents of the
     // npm --prefix install dir, so the binary lives at node_modules/.bin
-    // (matching where it's added on the install path below) — NOT bin/.
+    // (matching where it's added on the install path below) - NOT bin/.
     const cachedPath = tc.find(TOOL_NAME, version);
     if (cachedPath) {
         const cachedBin = path.join(cachedPath, 'node_modules', '.bin');
@@ -84520,9 +84679,9 @@ async function installCdkInsights(requestedVersion) {
             core.addPath(cachedBin);
             return version;
         }
-        core.warning(`Cached cdk-insights ${version} is missing its binary — reinstalling.`);
+        core.warning(`Cached cdk-insights ${version} is missing its binary - reinstalling.`);
     }
-    // Not cached — install to a temp directory and cache it
+    // Not cached - install to a temp directory and cache it
     core.info(`Installing cdk-insights@${version}...`);
     const installDir = path.join(process.env.RUNNER_TEMP || '/tmp', `cdk-insights-${version}`);
     fs.mkdirSync(installDir, { recursive: true });
@@ -84557,7 +84716,7 @@ async function runAnalysis(args, workingDirectory, licenseKey) {
     // variables to forward (PATH, HOME, GITHUB_*, etc.). The intent was
     // defence-in-depth: stop accidental leakage of workflow secrets into
     // the CLI. In practice the allowlist blocked every env var a CDK
-    // app reads at synth time — AWS_REGION / AWS_ACCESS_KEY_ID /
+    // app reads at synth time - AWS_REGION / AWS_ACCESS_KEY_ID /
     // AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN for SDK calls,
     // CDK_DEFAULT_ACCOUNT / CDK_DEFAULT_REGION for bootstrap targeting,
     // and project-specific config vars like STAGE, STRIPE_EVENT_SOURCE_NAME,
@@ -84578,7 +84737,7 @@ async function runAnalysis(args, workingDirectory, licenseKey) {
             env[key] = value;
         }
     }
-    // Keep CI=true on top — GitHub sets it, but belt and braces for
+    // Keep CI=true on top - GitHub sets it, but belt and braces for
     // projects that rely on the CLI auto-detecting a CI environment.
     env.CI = 'true';
     // Set license key if provided (controls AI analysis in the CLI)
@@ -84683,7 +84842,7 @@ async function run() {
                 }
             }
             else {
-                core.info('Generating SARIF output (second pass — cdk-insights < 1.44.0)...');
+                core.info('Generating SARIF output (second pass - cdk-insights < 1.44.0)...');
                 const sarifArgs = (0, args_1.buildSarifArgs)(inputs);
                 const sarifResult = await runAnalysis(sarifArgs, inputs.workingDirectory, inputs.licenseKey);
                 sarifFiles = (0, report_utils_1.selectSarifFiles)(findReportFiles(inputs.workingDirectory, 'sarif'));
@@ -84723,7 +84882,7 @@ async function run() {
             ? 'all pillars'
             : inputs.failOnPillars.join(', ');
         const failReasons = [];
-        // Severity gate (pillar-scoped) — only when fail-on is configured.
+        // Severity gate (pillar-scoped) - only when fail-on is configured.
         if (inputs.failOn.length > 0) {
             const failConditions = [];
             const gating = results.gatingCounts;
@@ -84743,7 +84902,7 @@ async function run() {
                 failReasons.push(`severity (${pillarScope}): ${failConditions.join(', ')}`);
             }
         }
-        // Finding-class gate — orthogonal to severity and pillar. Blocks on real
+        // Finding-class gate - orthogonal to severity and pillar. Blocks on real
         // risk (security/compliance) while best-practice advice can stay advisory.
         if (inputs.failOnClass.length > 0) {
             const classHits = inputs.failOnClass
@@ -84754,7 +84913,7 @@ async function run() {
             }
         }
         if (failReasons.length > 0) {
-            core.setFailed(`Analysis found blocking issues — ${failReasons.join('; ')}`);
+            core.setFailed(`Analysis found blocking issues - ${failReasons.join('; ')}`);
             return;
         }
         // Success summary
@@ -84874,7 +85033,7 @@ const matchesFailOnPillar = (wafPillar, failOnPillars) => {
  * re-walk `recommendations[].issues[]` rather than trusting the
  * summary totals. When a report has no recommendations array (older
  * CLI) we fall back to the summary view but gating defaults to match
- * totals — safest over-report. The `summary.totalIssues` value is
+ * totals - safest over-report. The `summary.totalIssues` value is
  * still used for display in aggregate.
  */
 function parseResults(jsonPath, failOnPillars) {
@@ -84939,7 +85098,7 @@ function parseResults(jsonPath, failOnPillars) {
                 totalCounts: summaryCounts,
                 gatingCounts: summaryCounts,
                 // Summary-only reports carry no per-issue class data, so the
-                // class gate can't fire on them (fails open — never blocks).
+                // class gate can't fire on them (fails open - never blocks).
                 classCounts: {},
                 resourceCount: report.summary.totalResources ?? 0,
             };
@@ -84979,7 +85138,7 @@ function aggregateResults(jsonPaths, failOnPillars) {
  *
  * Outputs reflect the full view so badges / PR comments never hide
  * findings, but the fail-on exit code is computed strictly from
- * `gatingCounts` — findings whose pillar is in the user's
+ * `gatingCounts` - findings whose pillar is in the user's
  * `fail-on-pillars` allowlist (default: security only).
  */
 function setOutputs(results, jsonPaths, failOn, failOnClass, sarifPaths, artifactId) {
@@ -85012,7 +85171,7 @@ function setOutputs(results, jsonPaths, failOn, failOnClass, sarifPaths, artifac
             results.gatingCounts.lowCount;
         exitCode = totalInScope > 0 ? 1 : 0;
     }
-    // Finding-class gate is orthogonal to severity/pillar — fold it into the
+    // Finding-class gate is orthogonal to severity/pillar - fold it into the
     // exit code so a security/compliance finding fails even when severity
     // gating wouldn't (e.g. a MEDIUM security finding under fail-on: critical).
     if (exitCode === 0 &&
@@ -85198,14 +85357,6 @@ async function uploadSarifToCodeScanning(sarifPaths, token) {
 /***/ ((module) => {
 
 module.exports = eval("require")("encoding");
-
-
-/***/ }),
-
-/***/ 60075:
-/***/ ((module) => {
-
-module.exports = eval("require")("supports-color");
 
 
 /***/ }),

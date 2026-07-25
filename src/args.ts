@@ -13,7 +13,7 @@ export type ExtraReportFormat = 'sarif' | 'markdown';
  * For older CLIs the caller omits them and falls back to a second `scan` run
  * built with {@link buildSarifArgs}.
  *
- * Pure function — no side effects, fully testable.
+ * Pure function - no side effects, fully testable.
  */
 export function buildScanArgs(
   inputs: ActionInputs,
@@ -43,12 +43,12 @@ export function buildScanArgs(
     args.push('--prComment');
   }
 
-  // Services filter (yargs array type — pass as individual args)
+  // Services filter (yargs array type - pass as individual args)
   if (inputs.services.length > 0) {
     args.push('--services', ...inputs.services);
   }
 
-  // Rule filter (yargs array type — pass as individual args)
+  // Rule filter (yargs array type - pass as individual args)
   if (inputs.ruleFilter.length > 0) {
     args.push('--ruleFilter', ...inputs.ruleFilter);
   }
@@ -60,14 +60,14 @@ export function buildScanArgs(
   // Single-pass extra reports (CLI >= 1.44.0). Writes the SARIF and/or
   // Markdown report files alongside the JSON one without a second scan,
   // so we don't re-synthesize, re-run AI, or upload a duplicate scan to
-  // scan history. yargs array option — pass each value as its own arg.
+  // scan history. yargs array option - pass each value as its own arg.
   if (extraReports.length > 0) {
     args.push('--reports', ...extraReports);
   }
 
   // Stack selection goes LAST. The `--` separator stops a flag-like stack
   // name from being parsed as an option (defence-in-depth on top of the
-  // input validation), but everything after `--` is treated as positional —
+  // input validation), but everything after `--` is treated as positional -
   // so it must come after every flag, or the flags get swallowed too.
   appendStackSelection(args, inputs);
 
@@ -110,7 +110,7 @@ export function buildSarifArgs(inputs: ActionInputs): string[] {
 
   args.push('--format', 'sarif');
 
-  // Stack selection last — see buildScanArgs / appendStackSelection.
+  // Stack selection last - see buildScanArgs / appendStackSelection.
   appendStackSelection(args, inputs);
 
   return args;

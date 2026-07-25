@@ -4,8 +4,8 @@ on:
   push:
     tags:
       # Only trigger on semver tags (vX.Y.Z, vX.Y.Z-foo). The rolling
-      # major-version alias tag (`v1`) — which we move to point at the
-      # latest release so consumers can pin `@v1` — must NOT fire this
+      # major-version alias tag (`v1`) - which we move to point at the
+      # latest release so consumers can pin `@v1` - must NOT fire this
       # workflow. The validation step downstream would reject it as
       # "Invalid version tag" and the run is recorded as a failure.
       - 'v*.*.*'
