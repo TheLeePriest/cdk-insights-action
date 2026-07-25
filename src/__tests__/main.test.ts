@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildScanArgs, buildSarifArgs } from '../args';
-import { ActionInputs } from '../inputs';
+import type { ActionInputs } from '../inputs';
 
 function defaultInputs(overrides: Partial<ActionInputs> = {}): ActionInputs {
   return {

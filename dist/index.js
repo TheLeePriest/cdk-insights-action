@@ -56339,11 +56339,11 @@ function endGroup() {
 
 // src/main.ts
 var exec = __toESM(require_exec());
-var fs9 = __toESM(require("fs"));
-var path9 = __toESM(require("path"));
+var fs9 = __toESM(require("node:fs"));
+var path9 = __toESM(require("node:path"));
 
 // src/inputs.ts
-var path2 = __toESM(require("path"));
+var path2 = __toESM(require("node:path"));
 var SAFE_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 var SAFE_SERVICE_PATTERN = /^[a-zA-Z0-9]+$/;
 var SAFE_RULE_PATTERN = /^[a-zA-Z0-9_.-]+$/;
@@ -56498,7 +56498,7 @@ function parseInputs() {
 }
 
 // src/outputs.ts
-var fs3 = __toESM(require("fs"));
+var fs3 = __toESM(require("node:fs"));
 var emptyCounts = () => ({
   criticalCount: 0,
   highCount: 0,
@@ -60680,9 +60680,9 @@ function getOctokit(token, options, ...additionalPlugins) {
 }
 
 // src/sarif-upload.ts
-var import_zlib = require("zlib");
-var import_fs3 = require("fs");
-var path3 = __toESM(require("path"));
+var import_node_fs = require("node:fs");
+var path3 = __toESM(require("node:path"));
+var import_node_zlib = require("node:zlib");
 async function uploadSarifToCodeScanning(sarifPaths, token) {
   const octokit = getOctokit(token);
   const { owner, repo } = context2.repo;
@@ -60691,8 +60691,8 @@ async function uploadSarifToCodeScanning(sarifPaths, token) {
   for (const sarifPath of sarifPaths) {
     const fileName = path3.basename(sarifPath);
     try {
-      const content = (0, import_fs3.readFileSync)(sarifPath, "utf8");
-      const compressed = (0, import_zlib.gzipSync)(content).toString("base64");
+      const content = (0, import_node_fs.readFileSync)(sarifPath, "utf8");
+      const compressed = (0, import_node_zlib.gzipSync)(content).toString("base64");
       const { data } = await octokit.rest.codeScanning.uploadSarif({
         owner,
         repo,
@@ -63681,7 +63681,7 @@ function stringToUint8Array(value, format) {
 // node_modules/@typespec/ts-http-runtime/dist/esm/nodeHttpClient.js
 var import_node_http = __toESM(require("node:http"), 1);
 var import_node_https = __toESM(require("node:https"), 1);
-var import_node_zlib = __toESM(require("node:zlib"), 1);
+var import_node_zlib2 = __toESM(require("node:zlib"), 1);
 var import_node_stream = require("node:stream");
 
 // node_modules/@typespec/ts-http-runtime/dist/esm/log.js
@@ -63927,11 +63927,11 @@ function getResponseHeaders(res) {
 function getDecodedResponseStream(stream4, headers) {
   const contentEncoding = headers.get("Content-Encoding");
   if (contentEncoding === "gzip") {
-    const unzip2 = import_node_zlib.default.createGunzip();
+    const unzip2 = import_node_zlib2.default.createGunzip();
     stream4.pipe(unzip2);
     return unzip2;
   } else if (contentEncoding === "deflate") {
-    const inflate = import_node_zlib.default.createInflate();
+    const inflate = import_node_zlib2.default.createInflate();
     stream4.pipe(inflate);
     return inflate;
   }
@@ -92057,7 +92057,7 @@ var Batch = class {
 };
 
 // node_modules/@azure/storage-blob/dist/esm/utils/utils.js
-var import_node_fs = __toESM(require("node:fs"), 1);
+var import_node_fs2 = __toESM(require("node:fs"), 1);
 var import_node_util3 = __toESM(require("node:util"), 1);
 async function streamToBuffer(stream4, buffer2, offset, end, encoding) {
   let pos = 0;
@@ -92096,7 +92096,7 @@ async function streamToBuffer(stream4, buffer2, offset, end, encoding) {
 }
 async function readStreamToLocalFile(rs, file) {
   return new Promise((resolve4, reject) => {
-    const ws = import_node_fs.default.createWriteStream(file);
+    const ws = import_node_fs2.default.createWriteStream(file);
     rs.on("error", (err) => {
       reject(err);
     });
@@ -92107,8 +92107,8 @@ async function readStreamToLocalFile(rs, file) {
     rs.pipe(ws);
   });
 }
-var fsStat = import_node_util3.default.promisify(import_node_fs.default.stat);
-var fsCreateReadStream = import_node_fs.default.createReadStream;
+var fsStat = import_node_util3.default.promisify(import_node_fs2.default.stat);
+var fsCreateReadStream = import_node_fs2.default.createReadStream;
 
 // node_modules/@azure/storage-blob/dist/esm/Clients.js
 var BlobClient = class _BlobClient extends StorageClient2 {
@@ -96016,7 +96016,7 @@ If the error persists, please check whether Actions and API requests are operati
 var client = new DefaultArtifactClient();
 
 // src/artifact-upload.ts
-var path7 = __toESM(require("path"));
+var path7 = __toESM(require("node:path"));
 async function uploadReportArtifacts(filePaths, artifactName, rootDirectory) {
   if (filePaths.length === 0) {
     info("No report files to upload as artifact");
@@ -96048,7 +96048,7 @@ async function uploadReportArtifacts(filePaths, artifactName, rootDirectory) {
 }
 
 // src/report-utils.ts
-var path8 = __toESM(require("path"));
+var path8 = __toESM(require("node:path"));
 var REPORT_SUFFIX = "_analysis_report";
 var CONSOLIDATED_SARIF = `consolidated${REPORT_SUFFIX}.sarif`;
 var REPORTS_FLAG_MIN_VERSION = "1.44.0";

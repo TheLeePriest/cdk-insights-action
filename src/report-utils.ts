@@ -1,4 +1,4 @@
-import * as path from 'path';
+import * as path from 'node:path';
 
 /** Suffix the CLI appends to every report file: `{stack}_analysis_report.<ext>`. */
 export const REPORT_SUFFIX = '_analysis_report';

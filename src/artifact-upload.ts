@@ -1,6 +1,6 @@
 import * as core from '@actions/core';
 import { DefaultArtifactClient } from '@actions/artifact';
-import * as path from 'path';
+import * as path from 'node:path';
 
 /**
  * Upload report files as a GitHub Actions artifact.

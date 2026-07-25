@@ -1,8 +1,8 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import { gzipSync } from 'zlib';
-import { readFileSync } from 'fs';
-import * as path from 'path';
+import { readFileSync } from 'node:fs';
+import * as path from 'node:path';
+import { gzipSync } from 'node:zlib';
 
 /**
  * Upload SARIF files to GitHub Code Scanning via the REST API.

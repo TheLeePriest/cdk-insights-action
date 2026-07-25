@@ -1,4 +1,4 @@
-import { ActionInputs } from './inputs';
+import type { ActionInputs } from './inputs';
 
 /**
  * Extra report-file formats the CLI's `--reports` flag understands. JSON is

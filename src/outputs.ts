@@ -1,5 +1,5 @@
 import * as core from '@actions/core';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import type { FindingClassKey, PillarKey } from './inputs';
 
 type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';

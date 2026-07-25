@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import { uploadSarifToCodeScanning } from '../sarif-upload';
 
 vi.mock('@actions/core');
 vi.mock('@actions/github');
-vi.mock('fs');
+vi.mock('node:fs');
 
 const mockedCore = vi.mocked(core);
 const mockedGithub = vi.mocked(github);
@@ -20,12 +20,20 @@ const mockGetOctokit = vi.fn().mockReturnValue({
     },
   },
 });
+const mutableGithub = mockedGithub as unknown as {
+  getOctokit: typeof mockGetOctokit;
+  context: {
+    repo: { owner: string; repo: string };
+    sha: string;
+    ref: string;
+  };
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
 
-  (mockedGithub as any).getOctokit = mockGetOctokit;
-  (mockedGithub as any).context = {
+  mutableGithub.getOctokit = mockGetOctokit;
+  mutableGithub.context = {
     repo: { owner: 'test-owner', repo: 'test-repo' },
     sha: 'abc123',
     ref: 'refs/heads/main',

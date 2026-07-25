@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import * as core from '@actions/core';
 import {
   parseResults,
   aggregateResults,
   setOutputs,
-  AnalysisResults,
-  SeverityCounts,
+  type AnalysisResults,
+  type SeverityCounts,
 } from '../outputs';
 
 vi.mock('@actions/core');
-vi.mock('fs');
+vi.mock('node:fs');
 
 const mockedFs = vi.mocked(fs);
 const mockedCore = vi.mocked(core);
