@@ -1,11 +1,14 @@
 import * as core from '@actions/core';
 import * as exec from '@actions/exec';
-import * as tc from '@actions/tool-cache';
 import * as fs from 'fs';
 import * as path from 'path';
 import { parseInputs } from './inputs';
 import { aggregateResults, setOutputs } from './outputs';
-import { buildScanArgs, buildSarifArgs, ExtraReportFormat } from './args';
+import {
+  buildScanArgs,
+  buildSarifArgs,
+  type ExtraReportFormat,
+} from './args';
 import { uploadSarifToCodeScanning } from './sarif-upload';
 import { uploadReportArtifacts } from './artifact-upload';
 import {
@@ -14,8 +17,6 @@ import {
   selectSarifFiles,
   versionGte,
 } from './report-utils';
-
-const TOOL_NAME = 'cdk-insights';
 
 /**
  * Resolve the version string to install.
@@ -48,31 +49,14 @@ async function resolveVersion(version: string): Promise<string> {
 }
 
 /**
- * Install cdk-insights CLI with tool caching.
- * On first run: installs via npm and caches. On subsequent runs: restores from cache.
+ * Install the cdk-insights CLI into the runner's temporary directory.
+ * npm's own package cache avoids repeatedly downloading unchanged packages.
  * Returns the resolved (numeric) version so the caller can gate features.
  */
 async function installCdkInsights(requestedVersion: string): Promise<string> {
   const version = await resolveVersion(requestedVersion);
   core.info(`Resolved cdk-insights version: ${version}`);
 
-  // Check tool cache first. The cached directory is the contents of the
-  // npm --prefix install dir, so the binary lives at node_modules/.bin
-  // (matching where it's added on the install path below) - NOT bin/.
-  const cachedPath = tc.find(TOOL_NAME, version);
-  if (cachedPath) {
-    const cachedBin = path.join(cachedPath, 'node_modules', '.bin');
-    if (fs.existsSync(path.join(cachedBin, 'cdk-insights'))) {
-      core.info(`Using cached cdk-insights ${version}`);
-      core.addPath(cachedBin);
-      return version;
-    }
-    core.warning(
-      `Cached cdk-insights ${version} is missing its binary - reinstalling.`,
-    );
-  }
-
-  // Not cached - install to a temp directory and cache it
   core.info(`Installing cdk-insights@${version}...`);
   const installDir = path.join(
     process.env.RUNNER_TEMP || '/tmp',
@@ -104,11 +88,9 @@ async function installCdkInsights(requestedVersion: string): Promise<string> {
     );
   }
 
-  // Cache the install directory for future runs
-  const cached = await tc.cacheDir(installDir, TOOL_NAME, version);
-  core.addPath(path.join(cached, 'node_modules', '.bin'));
+  core.addPath(binDir);
 
-  core.info(`cdk-insights ${version} installed and cached`);
+  core.info(`cdk-insights ${version} installed`);
   return version;
 }
 

@@ -247,6 +247,14 @@ describe('parseInputs', () => {
     expect(() => parseInputs()).toThrow('resolves outside the workspace');
   });
 
+  it('rejects a sibling directory that shares the workspace path prefix', () => {
+    const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
+    const siblingName = `${workspace.split(/[\\/]/).pop()}-malicious`;
+    mockInputs({ 'working-directory': `../${siblingName}` });
+
+    expect(() => parseInputs()).toThrow('resolves outside the workspace');
+  });
+
   it('filters empty strings from services list', () => {
     mockInputs({ services: 'S3,,Lambda,' });
 

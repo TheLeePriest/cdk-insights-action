@@ -4,9 +4,10 @@
   "description": "GitHub Action for CDK Insights - Analyze AWS CDK infrastructure for security, cost, and best practices",
   "main": "dist/index.js",
   "scripts": {
-    "build": "ncc build src/main.ts -o dist --source-map --license licenses.txt",
-    "format": "prettier --write 'src/**/*.ts'",
-    "lint": "eslint src/**/*.ts",
+    "build": "esbuild src/main.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/index.js --sourcemap --legal-comments=linked",
+    "format": "biome format --write src",
+    "lint": "biome lint src",
+    "check": "biome check src",
     "test": "vitest run",
     "all": "npm run format && npm run lint && npm run build && npm test"
   },
@@ -27,17 +28,19 @@
   "author": "CDK Insights",
   "license": "MIT",
   "dependencies": {
-    "@actions/artifact": "^2.2.2",
-    "@actions/core": "^1.10.1",
+    "@actions/artifact": "^6.2.1",
+    "@actions/core": "^3.0.1",
     "@actions/exec": "^1.1.1",
-    "@actions/github": "^6.0.1",
-    "@actions/tool-cache": "^2.0.2"
+    "@actions/github": "^9.1.1"
+  },
+  "overrides": {
+    "brace-expansion": "5.0.8"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.0.4",
     "@types/node": "^20.10.0",
-    "@vercel/ncc": "^0.38.1",
-    "prettier": "^3.1.0",
+    "esbuild": "^0.28.1",
     "typescript": "^5.3.2",
-    "vitest": "^1.0.0"
+    "vitest": "^4.1.10"
   }
 }

@@ -89,7 +89,12 @@ function validateInput(value: string, pattern: RegExp, label: string): void {
 function validateWorkingDirectory(dir: string): void {
   const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
   const resolved = path.resolve(workspace, dir);
-  if (!resolved.startsWith(workspace)) {
+  const relative = path.relative(workspace, resolved);
+  if (
+    relative === '..' ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
     throw new Error(
       `Invalid working-directory: "${dir}" resolves outside the workspace`,
     );

@@ -6,9 +6,9 @@ vi.mock('@actions/core');
 
 const mockUploadArtifact = vi.fn();
 vi.mock('@actions/artifact', () => ({
-  DefaultArtifactClient: vi.fn().mockImplementation(() => ({
-    uploadArtifact: mockUploadArtifact,
-  })),
+  DefaultArtifactClient: class {
+    uploadArtifact = mockUploadArtifact;
+  },
 }));
 
 const mockedCore = vi.mocked(core);
