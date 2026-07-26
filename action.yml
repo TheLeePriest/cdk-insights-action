@@ -35,7 +35,7 @@ inputs:
     default: ''
 
   fail-on:
-    description: 'Fail workflow on severity levels (comma-separated: critical,high,medium,low)'
+    description: 'Fail workflow on severity levels (comma-separated: critical,high,medium,low). When omitted, any finding within fail-on-pillars fails the workflow.'
     required: false
     default: ''
 
@@ -127,7 +127,7 @@ outputs:
     description: 'ID of the uploaded artifact (empty if upload-artifact is false)'
 
   exit-code:
-    description: 'Exit code from analysis (0 = success, 1 = issues found at fail-on severity)'
+    description: 'Exit code from analysis (0 = success, 1 = blocking findings found)'
 
 runs:
   using: 'node20'

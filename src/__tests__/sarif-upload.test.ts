@@ -31,6 +31,7 @@ const mutableGithub = mockedGithub as unknown as {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env.GITHUB_WORKSPACE = '/workspace/repository';
 
   mutableGithub.getOctokit = mockGetOctokit;
   mutableGithub.context = {
@@ -55,6 +56,7 @@ describe('uploadSarifToCodeScanning', () => {
       repo: 'test-repo',
       commit_sha: 'abc123',
       ref: 'refs/heads/main',
+      checkout_uri: 'file:///workspace/repository/',
       sarif: expect.any(String),
     });
 

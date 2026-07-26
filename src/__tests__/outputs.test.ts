@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   type AnalysisResults,
   aggregateResults,
+  buildFailReasons,
   parseResults,
   type SeverityCounts,
   setOutputs,
@@ -505,5 +506,27 @@ describe('setOutputs', () => {
       mockedCore.setOutput as ReturnType<typeof vi.fn>
     ).mock.calls.find((c: unknown[]) => c[0] === 'artifact-id');
     expect(artifactCall).toBeUndefined();
+  });
+});
+
+describe('buildFailReasons', () => {
+  const baseResults: AnalysisResults = {
+    totalIssues: 2,
+    totalCounts: counts(0, 1, 1, 0),
+    gatingCounts: counts(0, 1, 1, 0),
+    classCounts: { security: 2 },
+    resourceCount: 1,
+  };
+
+  it('fails on every in-scope finding when fail-on is omitted', () => {
+    expect(buildFailReasons(baseResults, [], [], ['security'])).toEqual([
+      'severity (security): 1 high, 1 medium',
+    ]);
+  });
+
+  it('combines configured severity and finding-class gates', () => {
+    expect(
+      buildFailReasons(baseResults, ['high'], ['security'], ['security']),
+    ).toEqual(['severity (security): 1 high', 'finding class: 2 security']);
   });
 });

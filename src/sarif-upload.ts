@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import * as core from '@actions/core';
 import * as github from '@actions/github';
@@ -17,6 +18,9 @@ export async function uploadSarifToCodeScanning(
   const { owner, repo } = github.context.repo;
   const commitSha = github.context.sha;
   const ref = github.context.ref;
+  const checkoutUri = pathToFileURL(
+    `${process.env.GITHUB_WORKSPACE || process.cwd()}/`,
+  ).href;
 
   for (const sarifPath of sarifPaths) {
     const fileName = path.basename(sarifPath);
@@ -29,6 +33,7 @@ export async function uploadSarifToCodeScanning(
         repo,
         commit_sha: commitSha,
         ref,
+        checkout_uri: checkoutUri,
         sarif: compressed,
       });
 

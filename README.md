@@ -12,7 +12,7 @@
 
 Static and AI-powered analysis for AWS CDK - runs `cdk-insights scan` against your synthesized stacks and surfaces findings as PR comments, GitHub Code Scanning alerts, and downloadable reports.
 
-> **Requires `cdk-insights` >= 1.44.1.** The CLI is installed automatically (`latest` by default), so no action is needed unless you pin an older version via `cdk-insights-version`. Explicit `ai-model` selection requires CLI 1.60.0+.
+> **Requires `cdk-insights` >= 1.44.1.** The CLI is installed automatically (`latest` by default), so no action is needed unless you pin an older version via `cdk-insights-version`. Explicit `ai-model` selection requires CLI 1.60.0+; complete static/CDK Nag finding-class gating requires 1.60.1+.
 
 ## Features
 
@@ -69,7 +69,7 @@ jobs:
 | `ai-model` | Model alias: `glm-4-7-flash` (0.5 credits/resource), `nova-lite` (0.5), `mistral-14b` (1), `haiku-4-5` (4), or `sonnet-4-6` (16). Requires CLI 1.60.0+. Omit to use the CLI default, GLM 4.7 Flash. | No | CLI default |
 | `fail-on` | Fail workflow on severity levels (comma-separated: `critical,high,medium,low`). Omit to fail on any finding within `fail-on-pillars` scope. | No | - |
 | `fail-on-pillars` | Which Well-Architected pillars count toward `fail-on`. Comma-separated list of `security`, `reliability`, `cost optimization`, `operational excellence`, `performance efficiency`, `sustainability`, or the shorthand `all`. Findings from other pillars are still reported but won't block the deploy. | No | `security` |
-| `fail-on-class` | Fail the build on findings of these **classes**, regardless of severity or pillar. Comma-separated list of `security`, `best-practice`, `compliance`. Orthogonal to `fail-on` / `fail-on-pillars` - block on real risk while best-practice advice stays advisory. Requires `cdk-insights >= 1.44.1`; older CLIs emit no class data, so the gate is a no-op. | No | (off) |
+| `fail-on-class` | Fail the build on findings of these **classes**, regardless of severity or pillar. Comma-separated list of `security`, `best-practice`, `compliance`. Orthogonal to `fail-on` / `fail-on-pillars` - block on real risk while best-practice advice stays advisory. Use `cdk-insights >= 1.60.1` so static, CDK Nag, validation, and AI findings are all classified. | No | (off) |
 | `pr-comment` | Post analysis summary as a PR comment (uses the `gh` CLI, authenticated via the workflow's `GITHUB_TOKEN`). | No | `true` |
 | `sarif-upload` | Generate SARIF and auto-upload to GitHub Code Scanning. Requires `security-events: write`. | No | `false` |
 | `upload-artifact` | Upload JSON, SARIF, and markdown report files as a workflow artifact. | No | `true` |
@@ -91,7 +91,7 @@ jobs:
 | `sarif-file` | Comma-separated paths to generated SARIF file(s) |
 | `json-file` | Comma-separated paths to JSON results file(s) |
 | `artifact-id` | ID of the uploaded artifact (omitted if `upload-artifact: false`) |
-| `exit-code` | `1` if any finding within `fail-on-pillars` matches `fail-on`, or any finding matches `fail-on-class`; otherwise `0` |
+| `exit-code` | `1` if any in-scope finding exists when `fail-on` is omitted, any finding matches a configured `fail-on` severity, or any finding matches `fail-on-class`; otherwise `0` |
 
 > Severity outputs always reflect **full totals** so PR comments and downstream badges never hide findings. The fail-on gate uses pillar-filtered counts internally.
 

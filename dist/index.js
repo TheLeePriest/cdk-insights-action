@@ -100373,6 +100373,35 @@ function aggregateResults(jsonPaths, failOnPillars) {
   }
   return combined;
 }
+function buildFailReasons(results, failOn, failOnClass, failOnPillars) {
+  const reasons = [];
+  const gating = results.gatingCounts;
+  const configuredSeverities = failOn.length > 0 ? failOn : ["critical", "high", "medium", "low"];
+  const severityHits = [];
+  if (configuredSeverities.includes("critical") && gating.criticalCount > 0) {
+    severityHits.push(`${gating.criticalCount} critical`);
+  }
+  if (configuredSeverities.includes("high") && gating.highCount > 0) {
+    severityHits.push(`${gating.highCount} high`);
+  }
+  if (configuredSeverities.includes("medium") && gating.mediumCount > 0) {
+    severityHits.push(`${gating.mediumCount} medium`);
+  }
+  if (configuredSeverities.includes("low") && gating.lowCount > 0) {
+    severityHits.push(`${gating.lowCount} low`);
+  }
+  if (severityHits.length > 0) {
+    const pillarScope = failOnPillars === "all" ? "all pillars" : failOnPillars.join(", ");
+    reasons.push(`severity (${pillarScope}): ${severityHits.join(", ")}`);
+  }
+  const classHits = failOnClass.filter((findingClass) => (results.classCounts[findingClass] ?? 0) > 0).map(
+    (findingClass) => `${results.classCounts[findingClass]} ${findingClass}`
+  );
+  if (classHits.length > 0) {
+    reasons.push(`finding class: ${classHits.join(", ")}`);
+  }
+  return reasons;
+}
 function setOutputs(results, jsonPaths, failOn, failOnClass, sarifPaths, artifactId) {
   setOutput("total-issues", results.totalIssues.toString());
   setOutput(
@@ -100389,17 +100418,7 @@ function setOutputs(results, jsonPaths, failOn, failOnClass, sarifPaths, artifac
   if (artifactId != null) {
     setOutput("artifact-id", artifactId.toString());
   }
-  let exitCode = 0;
-  if (failOn.length > 0) {
-    const matching = (failOn.includes("critical") ? results.gatingCounts.criticalCount : 0) + (failOn.includes("high") ? results.gatingCounts.highCount : 0) + (failOn.includes("medium") ? results.gatingCounts.mediumCount : 0) + (failOn.includes("low") ? results.gatingCounts.lowCount : 0);
-    exitCode = matching > 0 ? 1 : 0;
-  } else {
-    const totalInScope = results.gatingCounts.criticalCount + results.gatingCounts.highCount + results.gatingCounts.mediumCount + results.gatingCounts.lowCount;
-    exitCode = totalInScope > 0 ? 1 : 0;
-  }
-  if (exitCode === 0 && failOnClass.some((cls) => (results.classCounts[cls] ?? 0) > 0)) {
-    exitCode = 1;
-  }
+  const exitCode = buildFailReasons(results, failOn, failOnClass, "all").length > 0 ? 1 : 0;
   setOutput("exit-code", exitCode.toString());
 }
 
@@ -100429,12 +100448,16 @@ function selectSarifFiles(sarifFiles) {
 // src/sarif-upload.ts
 var import_node_fs2 = require("node:fs");
 var path8 = __toESM(require("node:path"));
+var import_node_url = require("node:url");
 var import_node_zlib2 = require("node:zlib");
 async function uploadSarifToCodeScanning(sarifPaths, token) {
   const octokit = getOctokit(token);
   const { owner, repo } = context4.repo;
   const commitSha = context4.sha;
   const ref = context4.ref;
+  const checkoutUri = (0, import_node_url.pathToFileURL)(
+    `${process.env.GITHUB_WORKSPACE || process.cwd()}/`
+  ).href;
   for (const sarifPath of sarifPaths) {
     const fileName = path8.basename(sarifPath);
     try {
@@ -100445,6 +100468,7 @@ async function uploadSarifToCodeScanning(sarifPaths, token) {
         repo,
         commit_sha: commitSha,
         ref,
+        checkout_uri: checkoutUri,
         sarif: compressed
       });
       info(
@@ -100585,10 +100609,10 @@ async function run() {
       inputs.licenseKey
     );
     if (stdout) {
-      info(stdout);
+      debug(stdout);
     }
     if (stderr) {
-      warning(stderr);
+      info(stderr);
     }
     endGroup();
     const jsonFiles = findReportFiles(inputs.workingDirectory, "json");
@@ -100671,34 +100695,12 @@ async function run() {
     );
     endGroup();
     const pillarScope = inputs.failOnPillars === "all" ? "all pillars" : inputs.failOnPillars.join(", ");
-    const failReasons = [];
-    if (inputs.failOn.length > 0) {
-      const failConditions = [];
-      const gating = results.gatingCounts;
-      if (inputs.failOn.includes("critical") && gating.criticalCount > 0) {
-        failConditions.push(`${gating.criticalCount} critical`);
-      }
-      if (inputs.failOn.includes("high") && gating.highCount > 0) {
-        failConditions.push(`${gating.highCount} high`);
-      }
-      if (inputs.failOn.includes("medium") && gating.mediumCount > 0) {
-        failConditions.push(`${gating.mediumCount} medium`);
-      }
-      if (inputs.failOn.includes("low") && gating.lowCount > 0) {
-        failConditions.push(`${gating.lowCount} low`);
-      }
-      if (failConditions.length > 0) {
-        failReasons.push(
-          `severity (${pillarScope}): ${failConditions.join(", ")}`
-        );
-      }
-    }
-    if (inputs.failOnClass.length > 0) {
-      const classHits = inputs.failOnClass.filter((c) => (results.classCounts[c] ?? 0) > 0).map((c) => `${results.classCounts[c]} ${c}`);
-      if (classHits.length > 0) {
-        failReasons.push(`finding class: ${classHits.join(", ")}`);
-      }
-    }
+    const failReasons = buildFailReasons(
+      results,
+      inputs.failOn,
+      inputs.failOnClass,
+      inputs.failOnPillars
+    );
     if (failReasons.length > 0) {
       setFailed(
         `Analysis found blocking issues - ${failReasons.join("; ")}`

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-07-26
+
+### Fixed
+
+- The Action conclusion now uses the same gate calculation as its `exit-code` output. With no `fail-on` input, any finding within `fail-on-pillars` fails the workflow as documented.
+- CLI JSON is kept out of normal Action logs, and expected machine-format diagnostics are logged as information instead of warnings.
+- Direct SARIF uploads now include `checkout_uri` so GitHub can resolve relative artifact locations reliably.
+
+### Changed
+
+- Documented that CLI 1.60.1+ is required for complete finding-class coverage across static, CDK Nag, validation, and AI findings.
+
 ## [1.6.0] - 2026-07-26
 
 ### Added

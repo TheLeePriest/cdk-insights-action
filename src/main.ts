@@ -5,7 +5,7 @@ import * as exec from '@actions/exec';
 import { buildSarifArgs, buildScanArgs, type ExtraReportFormat } from './args';
 import { uploadReportArtifacts } from './artifact-upload';
 import { parseInputs } from './inputs';
-import { aggregateResults, setOutputs } from './outputs';
+import { aggregateResults, buildFailReasons, setOutputs } from './outputs';
 import {
   REPORT_SUFFIX,
   REPORTS_FLAG_MIN_VERSION,
@@ -217,10 +217,14 @@ async function run(): Promise<void> {
     );
 
     if (stdout) {
-      core.info(stdout);
+      // JSON is the primary Action format. Keep the full document available
+      // for debug logging without flooding normal job logs with the report.
+      core.debug(stdout);
     }
     if (stderr) {
-      core.warning(stderr);
+      // The CLI deliberately routes progress to stderr for machine-readable
+      // formats; this is expected diagnostic output, not a warning.
+      core.info(stderr);
     }
     core.endGroup();
 
@@ -337,43 +341,12 @@ async function run(): Promise<void> {
         ? 'all pillars'
         : inputs.failOnPillars.join(', ');
 
-    const failReasons: string[] = [];
-
-    // Severity gate (pillar-scoped) - only when fail-on is configured.
-    if (inputs.failOn.length > 0) {
-      const failConditions: string[] = [];
-      const gating = results.gatingCounts;
-
-      if (inputs.failOn.includes('critical') && gating.criticalCount > 0) {
-        failConditions.push(`${gating.criticalCount} critical`);
-      }
-      if (inputs.failOn.includes('high') && gating.highCount > 0) {
-        failConditions.push(`${gating.highCount} high`);
-      }
-      if (inputs.failOn.includes('medium') && gating.mediumCount > 0) {
-        failConditions.push(`${gating.mediumCount} medium`);
-      }
-      if (inputs.failOn.includes('low') && gating.lowCount > 0) {
-        failConditions.push(`${gating.lowCount} low`);
-      }
-
-      if (failConditions.length > 0) {
-        failReasons.push(
-          `severity (${pillarScope}): ${failConditions.join(', ')}`,
-        );
-      }
-    }
-
-    // Finding-class gate - orthogonal to severity and pillar. Blocks on real
-    // risk (security/compliance) while best-practice advice can stay advisory.
-    if (inputs.failOnClass.length > 0) {
-      const classHits = inputs.failOnClass
-        .filter((c) => (results.classCounts[c] ?? 0) > 0)
-        .map((c) => `${results.classCounts[c]} ${c}`);
-      if (classHits.length > 0) {
-        failReasons.push(`finding class: ${classHits.join(', ')}`);
-      }
-    }
+    const failReasons = buildFailReasons(
+      results,
+      inputs.failOn,
+      inputs.failOnClass,
+      inputs.failOnPillars,
+    );
 
     if (failReasons.length > 0) {
       core.setFailed(

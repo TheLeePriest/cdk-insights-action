@@ -205,6 +205,54 @@ export function aggregateResults(
 }
 
 /**
+ * Build the human-readable reasons that make an Action run fail. Keeping this
+ * calculation in one place prevents the `exit-code` output and the actual
+ * Action conclusion from disagreeing.
+ */
+export function buildFailReasons(
+  results: AnalysisResults,
+  failOn: string[],
+  failOnClass: FindingClassKey[],
+  failOnPillars: PillarKey[] | 'all',
+): string[] {
+  const reasons: string[] = [];
+  const gating = results.gatingCounts;
+  const configuredSeverities =
+    failOn.length > 0 ? failOn : ['critical', 'high', 'medium', 'low'];
+  const severityHits: string[] = [];
+
+  if (configuredSeverities.includes('critical') && gating.criticalCount > 0) {
+    severityHits.push(`${gating.criticalCount} critical`);
+  }
+  if (configuredSeverities.includes('high') && gating.highCount > 0) {
+    severityHits.push(`${gating.highCount} high`);
+  }
+  if (configuredSeverities.includes('medium') && gating.mediumCount > 0) {
+    severityHits.push(`${gating.mediumCount} medium`);
+  }
+  if (configuredSeverities.includes('low') && gating.lowCount > 0) {
+    severityHits.push(`${gating.lowCount} low`);
+  }
+
+  if (severityHits.length > 0) {
+    const pillarScope =
+      failOnPillars === 'all' ? 'all pillars' : failOnPillars.join(', ');
+    reasons.push(`severity (${pillarScope}): ${severityHits.join(', ')}`);
+  }
+
+  const classHits = failOnClass
+    .filter((findingClass) => (results.classCounts[findingClass] ?? 0) > 0)
+    .map(
+      (findingClass) => `${results.classCounts[findingClass]} ${findingClass}`,
+    );
+  if (classHits.length > 0) {
+    reasons.push(`finding class: ${classHits.join(', ')}`);
+  }
+
+  return reasons;
+}
+
+/**
  * Set action outputs and compute the fail-on exit code.
  *
  * Outputs reflect the full view so badges / PR comments never hide
@@ -238,34 +286,11 @@ export function setOutputs(
     core.setOutput('artifact-id', artifactId.toString());
   }
 
-  let exitCode = 0;
-  if (failOn.length > 0) {
-    const matching =
-      (failOn.includes('critical') ? results.gatingCounts.criticalCount : 0) +
-      (failOn.includes('high') ? results.gatingCounts.highCount : 0) +
-      (failOn.includes('medium') ? results.gatingCounts.mediumCount : 0) +
-      (failOn.includes('low') ? results.gatingCounts.lowCount : 0);
-    exitCode = matching > 0 ? 1 : 0;
-  } else {
-    // No fail-on configured: any in-scope finding fails. Respects the
-    // pillar filter so a Reliability-only run never blocks by default.
-    const totalInScope =
-      results.gatingCounts.criticalCount +
-      results.gatingCounts.highCount +
-      results.gatingCounts.mediumCount +
-      results.gatingCounts.lowCount;
-    exitCode = totalInScope > 0 ? 1 : 0;
-  }
-
-  // Finding-class gate is orthogonal to severity/pillar - fold it into the
-  // exit code so a security/compliance finding fails even when severity
-  // gating wouldn't (e.g. a MEDIUM security finding under fail-on: critical).
-  if (
-    exitCode === 0 &&
-    failOnClass.some((cls) => (results.classCounts[cls] ?? 0) > 0)
-  ) {
-    exitCode = 1;
-  }
+  // The report has already been pillar-filtered into `gatingCounts`, so using
+  // `all` here does not broaden the gate. `main` passes the original pillar
+  // list to the same helper to produce the more specific user-facing label.
+  const exitCode =
+    buildFailReasons(results, failOn, failOnClass, 'all').length > 0 ? 1 : 0;
 
   core.setOutput('exit-code', exitCode.toString());
 }
