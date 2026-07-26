@@ -75,6 +75,7 @@ const SAFE_RULE_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 
 /** Semver pattern or 'latest' */
 const SAFE_VERSION_PATTERN = /^(latest|\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?)$/;
+const DEFAULT_CDK_INSIGHTS_VERSION = '1.60.1';
 
 /**
  * Validate a value against a pattern, throwing if invalid.
@@ -141,7 +142,8 @@ export function parseInputs(): ActionInputs {
   if (githubToken) {
     core.setSecret(githubToken);
   }
-  const cdkInsightsVersion = core.getInput('cdk-insights-version') || 'latest';
+  const cdkInsightsVersion =
+    core.getInput('cdk-insights-version') || DEFAULT_CDK_INSIGHTS_VERSION;
 
   // Parse comma-separated lists
   const failOnInput = core.getInput('fail-on');

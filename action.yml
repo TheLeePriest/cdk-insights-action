@@ -97,9 +97,9 @@ inputs:
     default: ${{ github.token }}
 
   cdk-insights-version:
-    description: 'Specific version of cdk-insights to use (default: latest)'
+    description: 'Specific cdk-insights version to use (defaults to the release tested with this action; use latest only to opt into automatic upgrades)'
     required: false
-    default: 'latest'
+    default: '1.60.1'
 
 outputs:
   total-issues:
@@ -130,5 +130,5 @@ outputs:
     description: 'Exit code from analysis (0 = success, 1 = blocking findings found)'
 
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'dist/index.js'

@@ -16,7 +16,7 @@ Static and AI-powered analysis for AWS CDK - runs `cdk-insights scan` against yo
 
 ## Features
 
-- **100+ rules across 36 AWS services** - security misconfigurations, cost waste, reliability gaps, and Well-Architected Framework pillar violations
+- **145 rules across 36 AWS services** - security misconfigurations, cost waste, reliability gaps, and Well-Architected Framework pillar violations
 - **AI-powered recommendations** - every privacy-safe user resource is reviewed, including resources not flagged by static rules
 - **Five selectable Bedrock models** - GLM 4.7 Flash is the rich, cost-effective default; opt into premium reasoning when a scan warrants it
 - **Predictable monthly credits** - 500 Free, 10,000 Pro, or 20,000 per Team seat; unchanged cache hits cost 0 and there are no automatic overage charges
@@ -46,7 +46,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install dependencies
         run: npm ci
@@ -99,7 +99,7 @@ jobs:
 
 ### Static Analysis (No License)
 
-100+ rules with PR comments - no signup required:
+145 rules with PR comments - no signup required:
 
 ```yaml
 - uses: instancelabs/cdk-insights-action@v1
@@ -199,7 +199,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
       - run: npm ci
 
       - uses: instancelabs/cdk-insights-action@v1
@@ -259,7 +259,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies
@@ -397,10 +397,10 @@ When `pr-comment: true` (default), the action posts a summary like:
 
 | Plan | Price | What's Included |
 |------|-------|-----------------|
-| **Free** (no signup) | £0 | Static analysis (100+ rules), JSON/Table/Markdown/SARIF output, multi-stack analysis |
+| **Free** (no signup) | £0 | Static analysis (145 rules), all six CLI output views, multi-stack analysis |
 | **Free** (signed-up) | £0 | Everything above + **500 AI credits/month**, using GLM 4.7 Flash or Nova Lite |
-| **Pro** | £9.99/mo | Everything in Free + all five Bedrock models, dashboard, PDF reports, **10,000 AI credits/month** |
-| **Team** | £12.99/seat/mo (2-seat minimum) | Everything in Pro + team management, shared configs, audit trails, **20,000 AI credits per seat/month** |
+| **Pro** | £15/mo | Everything in Free + all five Bedrock models, dashboard, PDF reports, **10,000 AI credits/month** |
+| **Team** | £12/seat/mo (2-seat minimum) | Everything in Pro + team management, shared configs, audit trails, **20,000 AI credits per seat/month** |
 
 Static analysis is **free forever** - no signup, no credit card. AI analysis requires a license key (free account or paid). There are no automatic overage charges: AI pauses when the allowance is exhausted while static analysis continues, then AI resumes at renewal.
 

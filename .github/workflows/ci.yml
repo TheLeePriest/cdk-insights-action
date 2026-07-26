@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies
@@ -34,22 +34,7 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Commit dist if changed
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          if [ "$(git diff --name-only dist/)" != "" ]; then
-            echo "dist/ is out of date, committing changes..."
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add dist/
-            git commit -m "build: update dist [skip ci]"
-            git push
-          else
-            echo "dist/ is up to date"
-          fi
-
       - name: Check dist is up to date
-        if: github.event_name == 'pull_request'
         run: |
           if [ "$(git diff --name-only dist/)" != "" ]; then
             echo "::error::dist/ is out of date. Run 'npm run build' and commit the result."
@@ -68,7 +53,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies
