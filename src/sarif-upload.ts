@@ -1,8 +1,8 @@
-import * as core from '@actions/core';
-import * as github from '@actions/github';
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { gzipSync } from 'node:zlib';
+import * as core from '@actions/core';
+import * as github from '@actions/github';
 
 /**
  * Upload SARIF files to GitHub Code Scanning via the REST API.
@@ -11,7 +11,7 @@ import { gzipSync } from 'node:zlib';
  */
 export async function uploadSarifToCodeScanning(
   sarifPaths: string[],
-  token: string
+  token: string,
 ): Promise<void> {
   const octokit = github.getOctokit(token);
   const { owner, repo } = github.context.repo;
@@ -32,13 +32,15 @@ export async function uploadSarifToCodeScanning(
         sarif: compressed,
       });
 
-      core.info(`SARIF uploaded to Code Scanning: ${fileName} (ID: ${data.id})`);
+      core.info(
+        `SARIF uploaded to Code Scanning: ${fileName} (ID: ${data.id})`,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       core.warning(
         `Failed to upload SARIF to Code Scanning (${fileName}): ${message}. ` +
-        'Ensure the workflow has security-events: write permission and ' +
-        'GitHub Code Security is enabled for private repos.'
+          'Ensure the workflow has security-events: write permission and ' +
+          'GitHub Code Security is enabled for private repos.',
       );
     }
   }

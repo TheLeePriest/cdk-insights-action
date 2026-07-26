@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as core from '@actions/core';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  parseResults,
-  aggregateResults,
-  setOutputs,
   type AnalysisResults,
+  aggregateResults,
+  parseResults,
   type SeverityCounts,
+  setOutputs,
 } from '../outputs';
 
 vi.mock('@actions/core');

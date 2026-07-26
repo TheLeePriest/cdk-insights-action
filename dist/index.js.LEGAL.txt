@@ -6,13 +6,6 @@ undici/lib/web/fetch/body.js:
 undici/lib/web/websocket/frame.js:
   /*! ws. MIT License. Einar Otto Stangvik <einaros@gmail.com> */
 
-content-type/dist/index.js:
-  /*!
-   * content-type
-   * Copyright(c) 2015 Douglas Christopher Wilson
-   * MIT Licensed
-   */
-
 normalize-path/index.js:
   /*!
    * normalize-path <https://github.com/jonschlinkert/normalize-path>
@@ -80,6 +73,13 @@ archiver/index.js:
    * @ignore
    * @license [MIT]{@link https://github.com/archiverjs/node-archiver/blob/master/LICENSE}
    * @copyright (c) 2012-2014 Chris Talkington, contributors.
+   */
+
+content-type/dist/index.js:
+  /*!
+   * content-type
+   * Copyright(c) 2015 Douglas Christopher Wilson
+   * MIT Licensed
    */
 
 @octokit/request-error/dist-src/index.js:

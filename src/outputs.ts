@@ -1,5 +1,6 @@
-import * as core from '@actions/core';
 import * as fs from 'node:fs';
+import * as core from '@actions/core';
+import { CompatibleAnalysisReportSchema } from '@instance-labs/cdk-insights-contract';
 import type { FindingClassKey, PillarKey } from './inputs';
 
 type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
@@ -30,37 +31,6 @@ export interface AnalysisResults {
    */
   classCounts: Record<string, number>;
   resourceCount: number;
-}
-
-interface Issue {
-  severity: Severity;
-  resourceId: string;
-  issue: string;
-  recommendation?: string;
-  wafPillar?: string;
-  /** Finding class axis (security | best-practice | compliance) - CLI >= 1.43.0. */
-  findingClass?: string;
-  foundBy?: string;
-}
-
-interface RecommendationItem {
-  resourceId: string;
-  logicalId?: string;
-  issues?: Issue[];
-}
-
-interface JsonReport {
-  summary?: {
-    totalIssues?: number;
-    severityCounts?: {
-      CRITICAL?: number;
-      HIGH?: number;
-      MEDIUM?: number;
-      LOW?: number;
-    };
-    totalResources?: number;
-  };
-  recommendations?: RecommendationItem[];
 }
 
 const emptyCounts = (): SeverityCounts => ({
@@ -133,7 +103,14 @@ export function parseResults(
 
   try {
     const content = fs.readFileSync(jsonPath, 'utf8');
-    const report: JsonReport = JSON.parse(content);
+    const parsed = CompatibleAnalysisReportSchema.safeParse(
+      JSON.parse(content),
+    );
+    if (!parsed.success) {
+      core.warning(`Failed to parse results file: ${parsed.error.message}`);
+      return defaults;
+    }
+    const report = parsed.data;
 
     const totalCounts = emptyCounts();
     const gatingCounts = emptyCounts();
@@ -141,12 +118,10 @@ export function parseResults(
     let totalIssues = 0;
     let resourceCount = 0;
 
-    if (report.recommendations && Array.isArray(report.recommendations)) {
+    if (report.recommendations) {
       resourceCount = report.recommendations.length;
       for (const resource of report.recommendations) {
-        if (!resource.issues) continue;
         for (const issue of resource.issues) {
-          if (!issue.severity) continue;
           totalIssues += 1;
           bumpCount(totalCounts, issue.severity);
           if (matchesFailOnPillar(issue.wafPillar, failOnPillars)) {

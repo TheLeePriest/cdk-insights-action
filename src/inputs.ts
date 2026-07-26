@@ -1,5 +1,5 @@
-import * as core from '@actions/core';
 import * as path from 'node:path';
+import * as core from '@actions/core';
 
 /**
  * Supported WAF pillars as emitted by the CLI on each finding.

@@ -1,6 +1,6 @@
-import * as core from '@actions/core';
-import { DefaultArtifactClient } from '@actions/artifact';
 import * as path from 'node:path';
+import { DefaultArtifactClient } from '@actions/artifact';
+import * as core from '@actions/core';
 
 /**
  * Upload report files as a GitHub Actions artifact.
@@ -9,7 +9,7 @@ import * as path from 'node:path';
 export async function uploadReportArtifacts(
   filePaths: string[],
   artifactName: string,
-  rootDirectory: string
+  rootDirectory: string,
 ): Promise<number | null> {
   if (filePaths.length === 0) {
     core.info('No report files to upload as artifact');
@@ -24,13 +24,13 @@ export async function uploadReportArtifacts(
       artifactName,
       filePaths,
       absRoot,
-      { retentionDays: 90 }
+      { retentionDays: 90 },
     );
 
     if (id != null) {
       const sizeStr = size != null ? ` ${(size / 1024).toFixed(1)} KB,` : '';
       core.info(
-        `Artifact "${artifactName}" uploaded (ID: ${id},${sizeStr} ${filePaths.length} file(s))`
+        `Artifact "${artifactName}" uploaded (ID: ${id},${sizeStr} ${filePaths.length} file(s))`,
       );
       return id;
     }

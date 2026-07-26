@@ -1,22 +1,18 @@
-import * as core from '@actions/core';
-import * as exec from '@actions/exec';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as core from '@actions/core';
+import * as exec from '@actions/exec';
+import { buildSarifArgs, buildScanArgs, type ExtraReportFormat } from './args';
+import { uploadReportArtifacts } from './artifact-upload';
 import { parseInputs } from './inputs';
 import { aggregateResults, setOutputs } from './outputs';
-import {
-  buildScanArgs,
-  buildSarifArgs,
-  type ExtraReportFormat,
-} from './args';
-import { uploadSarifToCodeScanning } from './sarif-upload';
-import { uploadReportArtifacts } from './artifact-upload';
 import {
   REPORT_SUFFIX,
   REPORTS_FLAG_MIN_VERSION,
   selectSarifFiles,
   versionGte,
 } from './report-utils';
+import { uploadSarifToCodeScanning } from './sarif-upload';
 
 /**
  * Resolve the version string to install.

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as core from '@actions/core';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { uploadReportArtifacts } from '../artifact-upload';
 
 vi.mock('@actions/core');
@@ -24,7 +24,7 @@ describe('uploadReportArtifacts', () => {
     const result = await uploadReportArtifacts(
       ['/workspace/report.json', '/workspace/report.sarif'],
       'cdk-insights-report',
-      '/workspace'
+      '/workspace',
     );
 
     expect(result).toBe(42);
@@ -32,15 +32,19 @@ describe('uploadReportArtifacts', () => {
       'cdk-insights-report',
       ['/workspace/report.json', '/workspace/report.sarif'],
       expect.any(String),
-      { retentionDays: 90 }
+      { retentionDays: 90 },
     );
     expect(mockedCore.info).toHaveBeenCalledWith(
-      expect.stringContaining('Artifact "cdk-insights-report" uploaded')
+      expect.stringContaining('Artifact "cdk-insights-report" uploaded'),
     );
   });
 
   it('returns null for empty file list', async () => {
-    const result = await uploadReportArtifacts([], 'cdk-insights-report', '/workspace');
+    const result = await uploadReportArtifacts(
+      [],
+      'cdk-insights-report',
+      '/workspace',
+    );
 
     expect(result).toBeNull();
     expect(mockUploadArtifact).not.toHaveBeenCalled();
@@ -52,12 +56,12 @@ describe('uploadReportArtifacts', () => {
     const result = await uploadReportArtifacts(
       ['/workspace/report.json'],
       'cdk-insights-report',
-      '/workspace'
+      '/workspace',
     );
 
     expect(result).toBeNull();
     expect(mockedCore.warning).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to upload artifact')
+      expect.stringContaining('Failed to upload artifact'),
     );
   });
 
@@ -67,12 +71,12 @@ describe('uploadReportArtifacts', () => {
     const result = await uploadReportArtifacts(
       ['/workspace/report.json'],
       'cdk-insights-report',
-      '/workspace'
+      '/workspace',
     );
 
     expect(result).toBeNull();
     expect(mockedCore.warning).toHaveBeenCalledWith(
-      expect.stringContaining('no artifact ID')
+      expect.stringContaining('no artifact ID'),
     );
   });
 });

@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as fs from 'node:fs';
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import * as fs from 'node:fs';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { uploadSarifToCodeScanning } from '../sarif-upload';
 
 vi.mock('@actions/core');
@@ -64,7 +64,7 @@ describe('uploadSarifToCodeScanning', () => {
     expect(typeof sarifArg).toBe('string');
 
     expect(mockedCore.info).toHaveBeenCalledWith(
-      expect.stringContaining('SARIF uploaded')
+      expect.stringContaining('SARIF uploaded'),
     );
   });
 
@@ -74,7 +74,7 @@ describe('uploadSarifToCodeScanning', () => {
 
     await uploadSarifToCodeScanning(
       ['/path/to/stack1.sarif', '/path/to/stack2.sarif'],
-      'test-token'
+      'test-token',
     );
 
     expect(mockUploadSarif).toHaveBeenCalledTimes(2);
@@ -85,11 +85,11 @@ describe('uploadSarifToCodeScanning', () => {
     mockUploadSarif.mockRejectedValue(new Error('403 Forbidden'));
 
     await expect(
-      uploadSarifToCodeScanning(['/path/to/results.sarif'], 'test-token')
+      uploadSarifToCodeScanning(['/path/to/results.sarif'], 'test-token'),
     ).resolves.toBeUndefined();
 
     expect(mockedCore.warning).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to upload SARIF')
+      expect.stringContaining('Failed to upload SARIF'),
     );
   });
 
@@ -101,13 +101,13 @@ describe('uploadSarifToCodeScanning', () => {
 
     await uploadSarifToCodeScanning(
       ['/path/to/stack1.sarif', '/path/to/stack2.sarif'],
-      'test-token'
+      'test-token',
     );
 
     expect(mockUploadSarif).toHaveBeenCalledTimes(2);
     expect(mockedCore.warning).toHaveBeenCalledTimes(1);
     expect(mockedCore.info).toHaveBeenCalledWith(
-      expect.stringContaining('SARIF uploaded')
+      expect.stringContaining('SARIF uploaded'),
     );
   });
 });
