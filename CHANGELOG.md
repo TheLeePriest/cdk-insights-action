@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] - 2026-07-26
+
+### Fixed
+
+- Machine-readable CLI JSON is now captured silently instead of being streamed by the process runner and repeated as a debug command, preventing full reports from flooding GitHub Action logs.
+- The `fail-on-class` action metadata now states that CLI 1.60.1+ is required for complete classification coverage.
+
 ## [1.6.1] - 2026-07-26
 
 ### Fixed

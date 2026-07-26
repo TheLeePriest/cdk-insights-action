@@ -19794,7 +19794,7 @@ var require_exec = __commonJS({
     exports2.getExecOutput = exports2.exec = void 0;
     var string_decoder_1 = require("string_decoder");
     var tr = __importStar(require_toolrunner());
-    function exec3(commandLine, args, options) {
+    function exec5(commandLine, args, options) {
       return __awaiter15(this, void 0, void 0, function* () {
         const commandArgs = tr.argStringToArray(commandLine);
         if (commandArgs.length === 0) {
@@ -19806,7 +19806,7 @@ var require_exec = __commonJS({
         return runner.exec();
       });
     }
-    exports2.exec = exec3;
+    exports2.exec = exec5;
     function getExecOutput2(commandLine, args, options) {
       var _a, _b;
       return __awaiter15(this, void 0, void 0, function* () {
@@ -19829,7 +19829,7 @@ var require_exec = __commonJS({
           }
         };
         const listeners = Object.assign(Object.assign({}, options === null || options === void 0 ? void 0 : options.listeners), { stdout: stdOutListener, stderr: stdErrListener });
-        const exitCode = yield exec3(commandLine, args, Object.assign(Object.assign({}, options), { listeners }));
+        const exitCode = yield exec5(commandLine, args, Object.assign(Object.assign({}, options), { listeners }));
         stdout += stdoutDecoder.end();
         stderr += stderrDecoder.end();
         return {
@@ -56342,7 +56342,17 @@ function endGroup() {
 }
 
 // src/main.ts
-var exec = __toESM(require_exec());
+var exec3 = __toESM(require_exec());
+
+// src/analysis-logging.ts
+function logAnalysisOutput(stdout, stderr) {
+  if (stdout) {
+    debug(`Captured CLI JSON output (${Buffer.byteLength(stdout)} bytes)`);
+  }
+  if (stderr) {
+    info(stderr);
+  }
+}
 
 // src/args.ts
 function buildScanArgs(inputs, extraReports = []) {
@@ -95714,6 +95724,38 @@ async function uploadReportArtifacts(filePaths, artifactName, rootDirectory) {
   }
 }
 
+// src/cli-runner.ts
+var exec = __toESM(require_exec());
+async function runAnalysis(args, workingDirectory, licenseKey) {
+  let stdout = "";
+  let stderr = "";
+  const env = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== void 0) {
+      env[key] = value;
+    }
+  }
+  env.CI = "true";
+  if (licenseKey) {
+    env.CDK_INSIGHTS_LICENSE_KEY = licenseKey;
+  }
+  const exitCode = await exec.exec("cdk-insights", args, {
+    cwd: workingDirectory,
+    env,
+    ignoreReturnCode: true,
+    silent: true,
+    listeners: {
+      stdout: (data) => {
+        stdout += data.toString();
+      },
+      stderr: (data) => {
+        stderr += data.toString();
+      }
+    }
+  });
+  return { exitCode, stdout, stderr };
+}
+
 // src/inputs.ts
 var path6 = __toESM(require("node:path"));
 var AI_MODEL_ALIASES = [
@@ -100488,7 +100530,7 @@ var AI_MODEL_FLAG_MIN_VERSION = "1.60.0";
 async function resolveVersion(version3) {
   if (version3 !== "latest") return version3;
   let stdout = "";
-  await exec.exec(
+  await exec3.exec(
     "npm",
     [
       "view",
@@ -100517,7 +100559,7 @@ async function installCdkInsights(requestedVersion) {
     `cdk-insights-${version3}`
   );
   fs9.mkdirSync(installDir, { recursive: true });
-  await exec.exec(
+  await exec3.exec(
     "npm",
     [
       "install",
@@ -100541,34 +100583,6 @@ async function installCdkInsights(requestedVersion) {
   addPath(binDir);
   info(`cdk-insights ${version3} installed`);
   return version3;
-}
-async function runAnalysis(args, workingDirectory, licenseKey) {
-  let stdout = "";
-  let stderr = "";
-  const env = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (value !== void 0) {
-      env[key] = value;
-    }
-  }
-  env.CI = "true";
-  if (licenseKey) {
-    env.CDK_INSIGHTS_LICENSE_KEY = licenseKey;
-  }
-  const exitCode = await exec.exec("cdk-insights", args, {
-    cwd: workingDirectory,
-    env,
-    ignoreReturnCode: true,
-    listeners: {
-      stdout: (data) => {
-        stdout += data.toString();
-      },
-      stderr: (data) => {
-        stderr += data.toString();
-      }
-    }
-  });
-  return { exitCode, stdout, stderr };
 }
 function findReportFiles(dir, ext) {
   if (!fs9.existsSync(dir)) return [];
@@ -100608,12 +100622,7 @@ async function run() {
       inputs.workingDirectory,
       inputs.licenseKey
     );
-    if (stdout) {
-      debug(stdout);
-    }
-    if (stderr) {
-      info(stderr);
-    }
+    logAnalysisOutput(stdout, stderr);
     endGroup();
     const jsonFiles = findReportFiles(inputs.workingDirectory, "json");
     if (exitCode !== 0 && jsonFiles.length === 0) {

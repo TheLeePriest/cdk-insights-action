@@ -56,8 +56,8 @@ inputs:
       or pillar. Comma-separated list of "security", "best-practice",
       "compliance". Orthogonal to fail-on / fail-on-pillars - block on real
       risk while best-practice advice stays non-blocking. Requires
-      cdk-insights >= 1.44.1 (the finding-class axis); older CLIs emit no
-      class data, so the gate never fires. Default: empty (gate off).
+      cdk-insights >= 1.60.1 for complete static, CDK Nag, validation, and AI
+      classification. Default: empty (gate off).
     required: false
     default: ''
 

@@ -1,6 +1,6 @@
 {
   "name": "cdk-insights-action",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "description": "GitHub Action for CDK Insights - Analyze AWS CDK infrastructure for security, cost, and best practices",
   "main": "dist/index.js",
   "scripts": {

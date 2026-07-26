@@ -2,8 +2,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as core from '@actions/core';
 import * as exec from '@actions/exec';
+import { logAnalysisOutput } from './analysis-logging';
 import { buildSarifArgs, buildScanArgs, type ExtraReportFormat } from './args';
 import { uploadReportArtifacts } from './artifact-upload';
+import { runAnalysis } from './cli-runner';
 import { parseInputs } from './inputs';
 import { aggregateResults, buildFailReasons, setOutputs } from './outputs';
 import {
@@ -92,67 +94,6 @@ async function installCdkInsights(requestedVersion: string): Promise<string> {
   return version;
 }
 
-async function runAnalysis(
-  args: string[],
-  workingDirectory: string,
-  licenseKey: string,
-): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  let stdout = '';
-  let stderr = '';
-
-  // Forward the full workflow environment to the CLI subprocess.
-  //
-  // Earlier revisions of this action maintained an ENV_ALLOWLIST of
-  // variables to forward (PATH, HOME, GITHUB_*, etc.). The intent was
-  // defence-in-depth: stop accidental leakage of workflow secrets into
-  // the CLI. In practice the allowlist blocked every env var a CDK
-  // app reads at synth time - AWS_REGION / AWS_ACCESS_KEY_ID /
-  // AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN for SDK calls,
-  // CDK_DEFAULT_ACCOUNT / CDK_DEFAULT_REGION for bootstrap targeting,
-  // and project-specific config vars like STAGE, STRIPE_EVENT_SOURCE_NAME,
-  // TARGET_EVENT_BUS_NAME. That broke every non-trivial CDK app: the
-  // CLI would run `cdk synth`, which would throw a Zod / dotenv /
-  // ParameterNotFound error because the required var was absent from
-  // the subprocess environment.
-  //
-  // The allowlist's threat model was also weak. Secrets reach the
-  // workflow env because the user put them there; the CLI uses them
-  // for local synthesis + sends findings to CDK Insights servers,
-  // never leaking env contents. Defensive filtering belongs one layer
-  // down, in the sensitive-data scanner that redacts CloudFormation
-  // template contents before sending to the backend.
-  const env: Record<string, string> = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined) {
-      env[key] = value;
-    }
-  }
-  // Keep CI=true on top - GitHub sets it, but belt and braces for
-  // projects that rely on the CLI auto-detecting a CI environment.
-  env.CI = 'true';
-
-  // Set license key if provided (controls AI analysis in the CLI)
-  if (licenseKey) {
-    env.CDK_INSIGHTS_LICENSE_KEY = licenseKey;
-  }
-
-  const exitCode = await exec.exec('cdk-insights', args, {
-    cwd: workingDirectory,
-    env,
-    ignoreReturnCode: true,
-    listeners: {
-      stdout: (data: Buffer) => {
-        stdout += data.toString();
-      },
-      stderr: (data: Buffer) => {
-        stderr += data.toString();
-      },
-    },
-  });
-
-  return { exitCode, stdout, stderr };
-}
-
 /**
  * Find auto-generated report files matching {stackName}_analysis_report.{ext}
  */
@@ -216,16 +157,7 @@ async function run(): Promise<void> {
       inputs.licenseKey,
     );
 
-    if (stdout) {
-      // JSON is the primary Action format. Keep the full document available
-      // for debug logging without flooding normal job logs with the report.
-      core.debug(stdout);
-    }
-    if (stderr) {
-      // The CLI deliberately routes progress to stderr for machine-readable
-      // formats; this is expected diagnostic output, not a warning.
-      core.info(stderr);
-    }
+    logAnalysisOutput(stdout, stderr);
     core.endGroup();
 
     // Find auto-generated JSON report files
