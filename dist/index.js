@@ -95769,6 +95769,7 @@ var SAFE_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 var SAFE_SERVICE_PATTERN = /^[a-zA-Z0-9]+$/;
 var SAFE_RULE_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 var SAFE_VERSION_PATTERN = /^(latest|\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?)$/;
+var DEFAULT_CDK_INSIGHTS_VERSION = "1.60.1";
 function validateInput(value, pattern, label) {
   if (!value) return;
   if (value.startsWith("-")) {
@@ -95815,7 +95816,7 @@ function parseInputs() {
   if (githubToken) {
     setSecret(githubToken);
   }
-  const cdkInsightsVersion = getInput("cdk-insights-version") || "latest";
+  const cdkInsightsVersion = getInput("cdk-insights-version") || DEFAULT_CDK_INSIGHTS_VERSION;
   const failOnInput = getInput("fail-on");
   const failOn = failOnInput ? failOnInput.split(",").map((s) => s.trim().toLowerCase()) : [];
   const failOnPillarsInput = (getInput("fail-on-pillars") || "security").trim().toLowerCase();
@@ -100565,6 +100566,9 @@ async function installCdkInsights(requestedVersion) {
       "install",
       "--prefix",
       installDir,
+      "--ignore-scripts",
+      "--no-audit",
+      "--no-fund",
       "--registry",
       "https://registry.npmjs.org",
       `cdk-insights@${version3}`
