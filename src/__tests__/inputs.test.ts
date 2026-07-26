@@ -12,6 +12,7 @@ function mockInputs(overrides: Record<string, string> = {}): void {
     'working-directory': '.',
     'stack-name': '',
     'ai-analysis': 'false',
+    'ai-model': '',
     'pr-comment': 'true',
     'sarif-upload': 'false',
     'upload-artifact': 'true',
@@ -46,6 +47,7 @@ describe('parseInputs', () => {
     expect(result.workingDirectory).toBe('.');
     expect(result.stackName).toBe('');
     expect(result.aiAnalysis).toBe(false);
+    expect(result.aiModel).toBe('');
     expect(result.prComment).toBe(true);
     expect(result.sarifUpload).toBe(false);
     expect(result.failOn).toEqual([]);
@@ -106,6 +108,24 @@ describe('parseInputs', () => {
     const result = parseInputs();
 
     expect(result.services).toEqual(['S3', 'Lambda', 'DynamoDB']);
+  });
+
+  it('accepts a supported AI model alias', () => {
+    mockInputs({ 'ai-model': 'haiku-4-5' });
+
+    expect(parseInputs().aiModel).toBe('haiku-4-5');
+  });
+
+  it('normalizes a supported AI model alias', () => {
+    mockInputs({ 'ai-model': 'GLM-4-7-FLASH' });
+
+    expect(parseInputs().aiModel).toBe('glm-4-7-flash');
+  });
+
+  it('rejects an unsupported AI model alias', () => {
+    mockInputs({ 'ai-model': 'made-up-model' });
+
+    expect(() => parseInputs()).toThrow('Invalid ai-model');
   });
 
   it('parses comma-separated rule filter', () => {

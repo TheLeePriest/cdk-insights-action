@@ -26,6 +26,14 @@ inputs:
     required: false
     default: 'false'
 
+  ai-model:
+    description: >-
+      AI model alias: glm-4-7-flash (default, 0.5 credits/resource),
+      nova-lite (0.5), mistral-14b (1), haiku-4-5 (4), or
+      sonnet-4-6 (16). Requires cdk-insights >= 1.60.0.
+    required: false
+    default: ''
+
   fail-on:
     description: 'Fail workflow on severity levels (comma-separated: critical,high,medium,low)'
     required: false

@@ -21,11 +21,22 @@ export type PillarKey =
  */
 export type FindingClassKey = 'security' | 'best-practice' | 'compliance';
 
+export const AI_MODEL_ALIASES = [
+  'glm-4-7-flash',
+  'nova-lite',
+  'mistral-14b',
+  'haiku-4-5',
+  'sonnet-4-6',
+] as const;
+
+export type AiModelAlias = (typeof AI_MODEL_ALIASES)[number];
+
 export interface ActionInputs {
   licenseKey: string;
   workingDirectory: string;
   stackName: string;
   aiAnalysis: boolean;
+  aiModel: AiModelAlias | '';
   failOn: string[];
   /**
    * Which WAF pillars count toward the fail-on thresholds. Reliability,
@@ -112,6 +123,16 @@ export function parseInputs(): ActionInputs {
   const workingDirectory = core.getInput('working-directory') || '.';
   const stackName = core.getInput('stack-name');
   const aiAnalysis = core.getBooleanInput('ai-analysis');
+  const rawAiModel = core.getInput('ai-model').trim().toLowerCase();
+  if (
+    rawAiModel &&
+    !(AI_MODEL_ALIASES as readonly string[]).includes(rawAiModel)
+  ) {
+    throw new Error(
+      `Invalid ai-model: "${rawAiModel}". Valid values: ${AI_MODEL_ALIASES.join(', ')}`,
+    );
+  }
+  const aiModel = rawAiModel as AiModelAlias | '';
   const prComment = core.getBooleanInput('pr-comment');
   const sarifUpload = core.getBooleanInput('sarif-upload');
   const uploadArtifact = core.getBooleanInput('upload-artifact');
@@ -235,6 +256,7 @@ export function parseInputs(): ActionInputs {
   core.info(`  Working Directory: ${workingDirectory}`);
   core.info(`  Stack Name: ${stackName || '(all stacks)'}`);
   core.info(`  AI Analysis: ${aiAnalysis}`);
+  core.info(`  AI Model: ${aiModel || '(CLI default: GLM 4.7 Flash)'}`);
   core.info(`  License Key: ${licenseKey ? '(provided)' : '(not provided)'}`);
   core.info(`  PR Comment: ${prComment}`);
   core.info(`  SARIF Upload: ${sarifUpload}`);
@@ -262,6 +284,7 @@ export function parseInputs(): ActionInputs {
     workingDirectory,
     stackName,
     aiAnalysis,
+    aiModel,
     failOn,
     failOnPillars,
     failOnClass,

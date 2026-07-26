@@ -12,19 +12,20 @@
 
 Static and AI-powered analysis for AWS CDK - runs `cdk-insights scan` against your synthesized stacks and surfaces findings as PR comments, GitHub Code Scanning alerts, and downloadable reports.
 
-> **Requires `cdk-insights` >= 1.44.1.** The CLI is installed automatically (`latest` by default), so no action is needed unless you pin an older version via `cdk-insights-version`. On older CLIs the action still runs but with reduced functionality - single-pass reports, the `fail-on-class` gate, and `stack-name` scoping all depend on 1.44.1+.
+> **Requires `cdk-insights` >= 1.44.1.** The CLI is installed automatically (`latest` by default), so no action is needed unless you pin an older version via `cdk-insights-version`. Explicit `ai-model` selection requires CLI 1.60.0+.
 
 ## Features
 
-- **100+ rules across 35+ AWS services** - security misconfigurations, cost waste, reliability gaps, and Well-Architected Framework pillar violations
-- **AI-powered recommendations** - context-aware analysis via AWS Bedrock (requires a CDK Insights account; 500 free credits/month or paid tier)
+- **100+ rules across 36 AWS services** - security misconfigurations, cost waste, reliability gaps, and Well-Architected Framework pillar violations
+- **AI-powered recommendations** - every privacy-safe user resource is reviewed, including resources not flagged by static rules
+- **Five selectable Bedrock models** - GLM 4.7 Flash is the rich, cost-effective default; opt into premium reasoning when a scan warrants it
+- **Predictable monthly credits** - 500 Free, 10,000 Pro, or 20,000 per Team seat; unchanged cache hits cost 0 and there are no automatic overage charges
 - **PR comments** - severity-bucketed summary posted on pull requests via `gh` CLI
 - **GitHub Code Scanning** - SARIF generated and auto-uploaded to the Security tab
 - **Report artifacts** - JSON, SARIF, and markdown reports persisted as downloadable workflow artifacts
 - **Per-pillar fail gating** - fail the build on Security findings only (default), or opt into Reliability / Cost / etc.
 - **Per-class fail gating** - block on `security` / `compliance` findings while best-practice advice stays advisory, independent of severity (`fail-on-class`)
 - **Single-pass reports** - with `cdk-insights >= 1.44.1` the JSON, SARIF, and Markdown reports are produced from one scan (no duplicate analysis or scan-history upload)
-- **CLI caching** - the `cdk-insights` npm package is cached via `@actions/tool-cache`, so subsequent runs skip the install step
 
 ## Quick Start
 
@@ -65,6 +66,7 @@ jobs:
 | `working-directory` | Directory containing the CDK project (validated to stay inside `GITHUB_WORKSPACE`). | No | `.` |
 | `stack-name` | Specific stack to analyze. Omit to analyze every stack (`--all`). | No | (all stacks) |
 | `ai-analysis` | Enable AI-powered recommendations. Requires `license-key`. Set to `false` with a license key to pass `--local` and force static-only analysis. | No | `false` |
+| `ai-model` | Model alias: `glm-4-7-flash` (0.5 credits/resource), `nova-lite` (0.5), `mistral-14b` (1), `haiku-4-5` (4), or `sonnet-4-6` (16). Requires CLI 1.60.0+. Omit to use the CLI default, GLM 4.7 Flash. | No | CLI default |
 | `fail-on` | Fail workflow on severity levels (comma-separated: `critical,high,medium,low`). Omit to fail on any finding within `fail-on-pillars` scope. | No | - |
 | `fail-on-pillars` | Which Well-Architected pillars count toward `fail-on`. Comma-separated list of `security`, `reliability`, `cost optimization`, `operational excellence`, `performance efficiency`, `sustainability`, or the shorthand `all`. Findings from other pillars are still reported but won't block the deploy. | No | `security` |
 | `fail-on-class` | Fail the build on findings of these **classes**, regardless of severity or pillar. Comma-separated list of `security`, `best-practice`, `compliance`. Orthogonal to `fail-on` / `fail-on-pillars` - block on real risk while best-practice advice stays advisory. Requires `cdk-insights >= 1.44.1`; older CLIs emit no class data, so the gate is a no-op. | No | (off) |
@@ -105,7 +107,7 @@ jobs:
 
 ### AI-Powered Analysis
 
-Enable Bedrock-backed recommendations. Works on any tier with a license key - Free accounts get 500 AI insights/month, Pro gets 5,000/month, Team gets 10,000 per seat:
+Enable Bedrock-backed recommendations. The CLI shows the selected model, its per-resource credit rate, and the maximum scan cost before analysis begins. Free accounts receive 500 credits/month, Pro receives 10,000, and Team receives 20,000 per seat:
 
 ```yaml
 - uses: instancelabs/cdk-insights-action@v1
@@ -113,6 +115,18 @@ Enable Bedrock-backed recommendations. Works on any tier with a license key - Fr
     license-key: ${{ secrets.CDK_INSIGHTS_LICENSE_KEY }}
     ai-analysis: true
 ```
+
+The default GLM 4.7 Flash model costs 0.5 credits per fresh resource and is available on every tier. To spend more credits on premium reasoning for a particular workflow:
+
+```yaml
+- uses: instancelabs/cdk-insights-action@v1
+  with:
+    license-key: ${{ secrets.CDK_INSIGHTS_LICENSE_KEY }}
+    ai-analysis: true
+    ai-model: haiku-4-5 # 4 credits per fresh resource
+```
+
+AI scans every privacy-safe user resource rather than only resources with an existing static finding. Repeat scans of unchanged resources use cached results and cost 0 credits.
 
 ### Static-Only with License Key
 
@@ -384,11 +398,11 @@ When `pr-comment: true` (default), the action posts a summary like:
 | Plan | Price | What's Included |
 |------|-------|-----------------|
 | **Free** (no signup) | £0 | Static analysis (100+ rules), JSON/Table/Markdown/SARIF output, multi-stack analysis |
-| **Free** (signed-up) | £0 | Everything above + 500 AI insights/month (Nova Lite) |
-| **Pro** | £9.99/mo | Everything in Free + full AI analysis (Bedrock), dashboard, PDF reports, **5,000 AI insights/month** |
-| **Team** | £12.99/seat/mo (2-seat minimum) | Everything in Pro + team management, shared configs, audit trails, **10,000 AI insights per seat** |
+| **Free** (signed-up) | £0 | Everything above + **500 AI credits/month**, using GLM 4.7 Flash or Nova Lite |
+| **Pro** | £9.99/mo | Everything in Free + all five Bedrock models, dashboard, PDF reports, **10,000 AI credits/month** |
+| **Team** | £12.99/seat/mo (2-seat minimum) | Everything in Pro + team management, shared configs, audit trails, **20,000 AI credits per seat/month** |
 
-Static analysis is **free forever** - no signup, no credit card. AI analysis requires a license key (free account or paid). Usage beyond the included monthly insights is billed per-credit on Pro/Team.
+Static analysis is **free forever** - no signup, no credit card. AI analysis requires a license key (free account or paid). There are no automatic overage charges: AI pauses when the allowance is exhausted while static analysis continues, then AI resumes at renewal.
 
 [View full pricing at cdkinsights.dev](https://cdkinsights.dev/pricing)
 

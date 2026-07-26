@@ -38,6 +38,10 @@ export function buildScanArgs(
     args.push('--local');
   }
 
+  if (inputs.aiModel) {
+    args.push('--model', inputs.aiModel);
+  }
+
   // PR comment (uses gh CLI, which auto-authenticates via GITHUB_TOKEN in GitHub Actions)
   if (inputs.prComment) {
     args.push('--prComment');
@@ -106,6 +110,10 @@ export function buildSarifArgs(inputs: ActionInputs): string[] {
   // run was forced local).
   if (!inputs.aiAnalysis && inputs.licenseKey) {
     args.push('--local');
+  }
+
+  if (inputs.aiModel) {
+    args.push('--model', inputs.aiModel);
   }
 
   args.push('--format', 'sarif');

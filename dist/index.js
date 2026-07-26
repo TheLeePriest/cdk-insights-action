@@ -56353,6 +56353,9 @@ function buildScanArgs(inputs, extraReports = []) {
   if (!inputs.aiAnalysis && inputs.licenseKey) {
     args.push("--local");
   }
+  if (inputs.aiModel) {
+    args.push("--model", inputs.aiModel);
+  }
   if (inputs.prComment) {
     args.push("--prComment");
   }
@@ -56383,6 +56386,9 @@ function buildSarifArgs(inputs) {
   args.push("--warn-sensitive");
   if (!inputs.aiAnalysis && inputs.licenseKey) {
     args.push("--local");
+  }
+  if (inputs.aiModel) {
+    args.push("--model", inputs.aiModel);
   }
   args.push("--format", "sarif");
   appendStackSelection(args, inputs);
@@ -95710,6 +95716,13 @@ async function uploadReportArtifacts(filePaths, artifactName, rootDirectory) {
 
 // src/inputs.ts
 var path6 = __toESM(require("node:path"));
+var AI_MODEL_ALIASES = [
+  "glm-4-7-flash",
+  "nova-lite",
+  "mistral-14b",
+  "haiku-4-5",
+  "sonnet-4-6"
+];
 var SAFE_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 var SAFE_SERVICE_PATTERN = /^[a-zA-Z0-9]+$/;
 var SAFE_RULE_PATTERN = /^[a-zA-Z0-9_.-]+$/;
@@ -95745,6 +95758,13 @@ function parseInputs() {
   const workingDirectory = getInput("working-directory") || ".";
   const stackName = getInput("stack-name");
   const aiAnalysis = getBooleanInput("ai-analysis");
+  const rawAiModel = getInput("ai-model").trim().toLowerCase();
+  if (rawAiModel && !AI_MODEL_ALIASES.includes(rawAiModel)) {
+    throw new Error(
+      `Invalid ai-model: "${rawAiModel}". Valid values: ${AI_MODEL_ALIASES.join(", ")}`
+    );
+  }
+  const aiModel = rawAiModel;
   const prComment = getBooleanInput("pr-comment");
   const sarifUpload = getBooleanInput("sarif-upload");
   const uploadArtifact2 = getBooleanInput("upload-artifact");
@@ -95823,6 +95843,7 @@ function parseInputs() {
   info(`  Working Directory: ${workingDirectory}`);
   info(`  Stack Name: ${stackName || "(all stacks)"}`);
   info(`  AI Analysis: ${aiAnalysis}`);
+  info(`  AI Model: ${aiModel || "(CLI default: GLM 4.7 Flash)"}`);
   info(`  License Key: ${licenseKey ? "(provided)" : "(not provided)"}`);
   info(`  PR Comment: ${prComment}`);
   info(`  SARIF Upload: ${sarifUpload}`);
@@ -95849,6 +95870,7 @@ function parseInputs() {
     workingDirectory,
     stackName,
     aiAnalysis,
+    aiModel,
     failOn,
     failOnPillars,
     failOnClass,
@@ -100438,6 +100460,7 @@ async function uploadSarifToCodeScanning(sarifPaths, token) {
 }
 
 // src/main.ts
+var AI_MODEL_FLAG_MIN_VERSION = "1.60.0";
 async function resolveVersion(version3) {
   if (version3 !== "latest") return version3;
   let stdout = "";
@@ -100534,6 +100557,11 @@ async function run() {
     startGroup("Setup");
     const resolvedVersion = await installCdkInsights(inputs.cdkInsightsVersion);
     endGroup();
+    if (inputs.aiModel && !versionGte(resolvedVersion, AI_MODEL_FLAG_MIN_VERSION)) {
+      throw new Error(
+        `The ai-model input requires cdk-insights >= ${AI_MODEL_FLAG_MIN_VERSION}; resolved ${resolvedVersion}. Remove the version pin or clear ai-model.`
+      );
+    }
     if (inputs.aiAnalysis && !inputs.licenseKey) {
       warning(
         "AI analysis requested but no license key provided - using static analysis only"

@@ -8,6 +8,7 @@ function defaultInputs(overrides: Partial<ActionInputs> = {}): ActionInputs {
     workingDirectory: '.',
     stackName: '',
     aiAnalysis: false,
+    aiModel: '',
     failOn: [],
     failOnPillars: ['security'],
     failOnClass: [],
@@ -159,6 +160,26 @@ describe('buildScanArgs', () => {
     expect(args).not.toContain('--ai');
   });
 
+  it('passes the selected AI model to the CLI', () => {
+    const args = buildScanArgs(
+      defaultInputs({
+        aiAnalysis: true,
+        aiModel: 'haiku-4-5',
+        licenseKey: 'key-123',
+      }),
+    );
+
+    const modelIdx = args.indexOf('--model');
+    expect(modelIdx).toBeGreaterThan(-1);
+    expect(args[modelIdx + 1]).toBe('haiku-4-5');
+  });
+
+  it('leaves model selection to the CLI when no model is selected', () => {
+    const args = buildScanArgs(defaultInputs({ aiModel: '' }));
+
+    expect(args).not.toContain('--model');
+  });
+
   it('never includes --outputFile flag', () => {
     const args = buildScanArgs(defaultInputs());
 
@@ -226,5 +247,18 @@ describe('buildSarifArgs', () => {
     expect(
       buildSarifArgs(defaultInputs({ licenseKey: 'k', aiAnalysis: true })),
     ).not.toContain('--local');
+  });
+
+  it('mirrors the selected model in a legacy SARIF fallback scan', () => {
+    const args = buildSarifArgs(
+      defaultInputs({
+        aiAnalysis: true,
+        aiModel: 'mistral-14b',
+        licenseKey: 'k',
+      }),
+    );
+
+    const modelIdx = args.indexOf('--model');
+    expect(args[modelIdx + 1]).toBe('mistral-14b');
   });
 });

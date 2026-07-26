@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-07-26
+
+### Added
+
+- `ai-model` input for choosing GLM 4.7 Flash, Nova Lite, Mistral 14B, Claude Haiku 4.5, or Claude Sonnet 4.6. Aliases are validated before invoking the CLI and the chosen model is forwarded to both the primary scan and legacy SARIF fallback.
+
+### Changed
+
+- Updated AI documentation for the GLM 4.7 Flash default, per-model credit rates, full-resource AI coverage, zero-credit cache hits, and the new monthly allowances: 500 Free, 10,000 Pro, and 20,000 per Team seat.
+- Clarified that allowances are fixed and server-enforced; there are no automatic usage overage charges.
+- Removed a stale claim that the current installer uses `@actions/tool-cache`.
+
 ## [1.5.1] - 2026-06-19
 
 ### Fixed

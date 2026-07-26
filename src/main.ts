@@ -14,6 +14,8 @@ import {
 } from './report-utils';
 import { uploadSarifToCodeScanning } from './sarif-upload';
 
+const AI_MODEL_FLAG_MIN_VERSION = '1.60.0';
+
 /**
  * Resolve the version string to install.
  * If 'latest', queries npm for the actual version number (needed for cache key).
@@ -170,6 +172,15 @@ async function run(): Promise<void> {
     core.startGroup('Setup');
     const resolvedVersion = await installCdkInsights(inputs.cdkInsightsVersion);
     core.endGroup();
+
+    if (
+      inputs.aiModel &&
+      !versionGte(resolvedVersion, AI_MODEL_FLAG_MIN_VERSION)
+    ) {
+      throw new Error(
+        `The ai-model input requires cdk-insights >= ${AI_MODEL_FLAG_MIN_VERSION}; resolved ${resolvedVersion}. Remove the version pin or clear ai-model.`,
+      );
+    }
 
     // Warn if AI requested without license
     if (inputs.aiAnalysis && !inputs.licenseKey) {
