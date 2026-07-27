@@ -20,6 +20,13 @@ function defaultInputs(overrides: Partial<ActionInputs> = {}): ActionInputs {
     services: [],
     ruleFilter: [],
     cdkInsightsVersion: 'latest',
+    deploymentPreview: false,
+    deploymentBaseline: '.cdk-insights-template-baseline.json',
+    deploymentFailOn: 'block',
+    policyFile: '',
+    reliabilityCheck: false,
+    liveCheck: false,
+    liveFailOn: 'never',
     ...overrides,
   };
 }

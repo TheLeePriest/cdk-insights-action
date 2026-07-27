@@ -62,6 +62,13 @@ export interface ActionInputs {
   services: string[];
   ruleFilter: string[];
   cdkInsightsVersion: string;
+  deploymentPreview: boolean;
+  deploymentBaseline: string;
+  deploymentFailOn: 'never' | 'review' | 'block';
+  policyFile: string;
+  reliabilityCheck: boolean;
+  liveCheck: boolean;
+  liveFailOn: 'never' | 'drift' | 'risk';
 }
 
 /** Safe pattern for stack names (alphanumeric, hyphens, underscores) */
@@ -75,7 +82,7 @@ const SAFE_RULE_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 
 /** Semver pattern or 'latest' */
 const SAFE_VERSION_PATTERN = /^(latest|\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?)$/;
-const DEFAULT_CDK_INSIGHTS_VERSION = '1.60.1';
+const DEFAULT_CDK_INSIGHTS_VERSION = '1.61.0';
 
 /**
  * Validate a value against a pattern, throwing if invalid.
@@ -144,6 +151,17 @@ export function parseInputs(): ActionInputs {
   }
   const cdkInsightsVersion =
     core.getInput('cdk-insights-version') || DEFAULT_CDK_INSIGHTS_VERSION;
+  const deploymentPreview = core.getBooleanInput('deployment-preview');
+  const deploymentBaseline =
+    core.getInput('deployment-baseline') ||
+    '.cdk-insights-template-baseline.json';
+  const deploymentFailOn = (core.getInput('deployment-fail-on') ||
+    'block') as ActionInputs['deploymentFailOn'];
+  const policyFile = core.getInput('policy-file');
+  const reliabilityCheck = core.getBooleanInput('reliability-check');
+  const liveCheck = core.getBooleanInput('live-check');
+  const liveFailOn = (core.getInput('live-fail-on') ||
+    'never') as ActionInputs['liveFailOn'];
 
   // Parse comma-separated lists
   const failOnInput = core.getInput('fail-on');
@@ -242,6 +260,16 @@ export function parseInputs(): ActionInputs {
 
   // Validate working directory (prevents path traversal)
   validateWorkingDirectory(workingDirectory);
+  validateWorkingDirectory(path.join(workingDirectory, deploymentBaseline));
+  if (policyFile) {
+    validateWorkingDirectory(path.join(workingDirectory, policyFile));
+  }
+  if (!['never', 'review', 'block'].includes(deploymentFailOn)) {
+    throw new Error(`Invalid deployment-fail-on: ${deploymentFailOn}`);
+  }
+  if (!['never', 'drift', 'risk'].includes(liveFailOn)) {
+    throw new Error(`Invalid live-fail-on: ${liveFailOn}`);
+  }
 
   // Validate fail-on values
   const validSeverities = ['critical', 'high', 'medium', 'low'];
@@ -280,6 +308,10 @@ export function parseInputs(): ActionInputs {
     core.info(`  Rule Filter: ${ruleFilter.join(', ')}`);
   }
   core.info(`  CDK Insights Version: ${cdkInsightsVersion}`);
+  core.info(`  Deployment Preview: ${deploymentPreview}`);
+  core.info(`  Policy Contract: ${policyFile || '(off)'}`);
+  core.info(`  Reliability Check: ${reliabilityCheck}`);
+  core.info(`  Live AWS Check: ${liveCheck}`);
 
   return {
     licenseKey,
@@ -298,5 +330,12 @@ export function parseInputs(): ActionInputs {
     services,
     ruleFilter,
     cdkInsightsVersion,
+    deploymentPreview,
+    deploymentBaseline,
+    deploymentFailOn,
+    policyFile,
+    reliabilityCheck,
+    liveCheck,
+    liveFailOn,
   };
 }

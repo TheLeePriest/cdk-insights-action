@@ -22,7 +22,7 @@ function mockInputs(overrides: Record<string, string> = {}): void {
     'rule-filter': '',
     'fail-on': '',
     'fail-on-class': '',
-    'cdk-insights-version': '1.60.1',
+    'cdk-insights-version': '1.61.0',
   };
 
   const values = { ...defaults, ...overrides };
@@ -54,7 +54,7 @@ describe('parseInputs', () => {
     expect(result.failOnClass).toEqual([]);
     expect(result.services).toEqual([]);
     expect(result.ruleFilter).toEqual([]);
-    expect(result.cdkInsightsVersion).toBe('1.60.1');
+    expect(result.cdkInsightsVersion).toBe('1.61.0');
   });
 
   it('parses and lowercases comma-separated fail-on-class values', () => {
@@ -198,7 +198,7 @@ describe('parseInputs', () => {
 
     const result = parseInputs();
 
-    expect(result.cdkInsightsVersion).toBe('1.60.1');
+    expect(result.cdkInsightsVersion).toBe('1.61.0');
   });
 
   // --- Input validation tests ---

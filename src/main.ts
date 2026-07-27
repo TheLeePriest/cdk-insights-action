@@ -17,6 +17,7 @@ import {
 import { uploadSarifToCodeScanning } from './sarif-upload';
 
 const AI_MODEL_FLAG_MIN_VERSION = '1.60.0';
+const INTELLIGENCE_COMMANDS_MIN_VERSION = '1.61.0';
 
 /**
  * Resolve the version string to install.
@@ -126,6 +127,20 @@ async function run(): Promise<void> {
       );
     }
 
+    const intelligenceEnabled =
+      inputs.deploymentPreview ||
+      !!inputs.policyFile ||
+      inputs.reliabilityCheck ||
+      inputs.liveCheck;
+    if (
+      intelligenceEnabled &&
+      !versionGte(resolvedVersion, INTELLIGENCE_COMMANDS_MIN_VERSION)
+    ) {
+      throw new Error(
+        `Deployment intelligence inputs require cdk-insights >= ${INTELLIGENCE_COMMANDS_MIN_VERSION}; resolved ${resolvedVersion}.`,
+      );
+    }
+
     // Warn if AI requested without license
     if (inputs.aiAnalysis && !inputs.licenseKey) {
       core.warning(
@@ -162,6 +177,65 @@ async function run(): Promise<void> {
 
     logAnalysisOutput(stdout, stderr);
     core.endGroup();
+
+    const guardrailFailures: string[] = [];
+    const runGuardrail = async (label: string, command: string[]) => {
+      core.startGroup(label);
+      core.info(`Command: cdk-insights ${command.join(' ')}`);
+      const result = await runAnalysis(
+        command,
+        inputs.workingDirectory,
+        inputs.licenseKey,
+      );
+      logAnalysisOutput(result.stdout, result.stderr);
+      core.endGroup();
+      if (result.exitCode !== 0) guardrailFailures.push(label);
+    };
+
+    // The main scan has already synthesized the application. Reuse cdk.out
+    // for every optional guardrail to avoid multiplying CI time and cost.
+    if (inputs.deploymentPreview) {
+      await runGuardrail('Deployment Risk Preview', [
+        'preview',
+        '--no-synth',
+        '--out-dir',
+        'cdk.out',
+        '--baseline',
+        inputs.deploymentBaseline,
+        '--fail-on',
+        inputs.deploymentFailOn,
+      ]);
+    }
+    if (inputs.policyFile) {
+      await runGuardrail('Infrastructure Policy Contract', [
+        'policy',
+        'check',
+        '--no-synth',
+        '--out-dir',
+        'cdk.out',
+        '--file',
+        inputs.policyFile,
+      ]);
+    }
+    if (inputs.reliabilityCheck) {
+      await runGuardrail('Reliability Simulation', [
+        'simulate',
+        '--no-synth',
+        '--out-dir',
+        'cdk.out',
+        '--fail-on-high',
+      ]);
+    }
+    if (inputs.liveCheck) {
+      await runGuardrail('Live AWS Drift and Risk', [
+        'live',
+        '--no-synth',
+        '--out-dir',
+        'cdk.out',
+        '--fail-on',
+        inputs.liveFailOn,
+      ]);
+    }
 
     // Find auto-generated JSON report files
     const jsonFiles = findReportFiles(inputs.workingDirectory, 'json');
@@ -283,9 +357,18 @@ async function run(): Promise<void> {
       inputs.failOnPillars,
     );
 
-    if (failReasons.length > 0) {
+    if (failReasons.length > 0 || guardrailFailures.length > 0) {
       core.setFailed(
-        `Analysis found blocking issues - ${failReasons.join('; ')}`,
+        [
+          failReasons.length > 0
+            ? `Analysis found blocking issues - ${failReasons.join('; ')}`
+            : '',
+          guardrailFailures.length > 0
+            ? `Guardrails failed: ${guardrailFailures.join(', ')}`
+            : '',
+        ]
+          .filter(Boolean)
+          .join('; '),
       );
       return;
     }

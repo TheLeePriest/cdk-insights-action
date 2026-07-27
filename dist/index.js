@@ -29625,7 +29625,7 @@ var require_BufferList = __commonJS({
         this.head = this.tail = null;
         this.length = 0;
       };
-      BufferList.prototype.join = function join3(s) {
+      BufferList.prototype.join = function join4(s) {
         if (this.length === 0) return "";
         var p = this.head;
         var ret = "" + p.data;
@@ -95769,7 +95769,7 @@ var SAFE_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 var SAFE_SERVICE_PATTERN = /^[a-zA-Z0-9]+$/;
 var SAFE_RULE_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 var SAFE_VERSION_PATTERN = /^(latest|\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?)$/;
-var DEFAULT_CDK_INSIGHTS_VERSION = "1.60.1";
+var DEFAULT_CDK_INSIGHTS_VERSION = "1.61.0";
 function validateInput(value, pattern, label) {
   if (!value) return;
   if (value.startsWith("-")) {
@@ -95817,6 +95817,13 @@ function parseInputs() {
     setSecret(githubToken);
   }
   const cdkInsightsVersion = getInput("cdk-insights-version") || DEFAULT_CDK_INSIGHTS_VERSION;
+  const deploymentPreview = getBooleanInput("deployment-preview");
+  const deploymentBaseline = getInput("deployment-baseline") || ".cdk-insights-template-baseline.json";
+  const deploymentFailOn = getInput("deployment-fail-on") || "block";
+  const policyFile = getInput("policy-file");
+  const reliabilityCheck = getBooleanInput("reliability-check");
+  const liveCheck = getBooleanInput("live-check");
+  const liveFailOn = getInput("live-fail-on") || "never";
   const failOnInput = getInput("fail-on");
   const failOn = failOnInput ? failOnInput.split(",").map((s) => s.trim().toLowerCase()) : [];
   const failOnPillarsInput = (getInput("fail-on-pillars") || "security").trim().toLowerCase();
@@ -95874,6 +95881,16 @@ function parseInputs() {
     "cdk-insights-version"
   );
   validateWorkingDirectory(workingDirectory);
+  validateWorkingDirectory(path6.join(workingDirectory, deploymentBaseline));
+  if (policyFile) {
+    validateWorkingDirectory(path6.join(workingDirectory, policyFile));
+  }
+  if (!["never", "review", "block"].includes(deploymentFailOn)) {
+    throw new Error(`Invalid deployment-fail-on: ${deploymentFailOn}`);
+  }
+  if (!["never", "drift", "risk"].includes(liveFailOn)) {
+    throw new Error(`Invalid live-fail-on: ${liveFailOn}`);
+  }
   const validSeverities = ["critical", "high", "medium", "low"];
   for (const severity of failOn) {
     if (!validSeverities.includes(severity)) {
@@ -95908,6 +95925,10 @@ function parseInputs() {
     info(`  Rule Filter: ${ruleFilter.join(", ")}`);
   }
   info(`  CDK Insights Version: ${cdkInsightsVersion}`);
+  info(`  Deployment Preview: ${deploymentPreview}`);
+  info(`  Policy Contract: ${policyFile || "(off)"}`);
+  info(`  Reliability Check: ${reliabilityCheck}`);
+  info(`  Live AWS Check: ${liveCheck}`);
   return {
     licenseKey,
     workingDirectory,
@@ -95924,7 +95945,14 @@ function parseInputs() {
     githubToken,
     services,
     ruleFilter,
-    cdkInsightsVersion
+    cdkInsightsVersion,
+    deploymentPreview,
+    deploymentBaseline,
+    deploymentFailOn,
+    policyFile,
+    reliabilityCheck,
+    liveCheck,
+    liveFailOn
   };
 }
 
@@ -100528,6 +100556,7 @@ async function uploadSarifToCodeScanning(sarifPaths, token) {
 
 // src/main.ts
 var AI_MODEL_FLAG_MIN_VERSION = "1.60.0";
+var INTELLIGENCE_COMMANDS_MIN_VERSION = "1.61.0";
 async function resolveVersion(version3) {
   if (version3 !== "latest") return version3;
   let stdout = "";
@@ -100604,6 +100633,12 @@ async function run() {
         `The ai-model input requires cdk-insights >= ${AI_MODEL_FLAG_MIN_VERSION}; resolved ${resolvedVersion}. Remove the version pin or clear ai-model.`
       );
     }
+    const intelligenceEnabled = inputs.deploymentPreview || !!inputs.policyFile || inputs.reliabilityCheck || inputs.liveCheck;
+    if (intelligenceEnabled && !versionGte(resolvedVersion, INTELLIGENCE_COMMANDS_MIN_VERSION)) {
+      throw new Error(
+        `Deployment intelligence inputs require cdk-insights >= ${INTELLIGENCE_COMMANDS_MIN_VERSION}; resolved ${resolvedVersion}.`
+      );
+    }
     if (inputs.aiAnalysis && !inputs.licenseKey) {
       warning(
         "AI analysis requested but no license key provided - using static analysis only"
@@ -100628,6 +100663,61 @@ async function run() {
     );
     logAnalysisOutput(stdout, stderr);
     endGroup();
+    const guardrailFailures = [];
+    const runGuardrail = async (label, command) => {
+      startGroup(label);
+      info(`Command: cdk-insights ${command.join(" ")}`);
+      const result = await runAnalysis(
+        command,
+        inputs.workingDirectory,
+        inputs.licenseKey
+      );
+      logAnalysisOutput(result.stdout, result.stderr);
+      endGroup();
+      if (result.exitCode !== 0) guardrailFailures.push(label);
+    };
+    if (inputs.deploymentPreview) {
+      await runGuardrail("Deployment Risk Preview", [
+        "preview",
+        "--no-synth",
+        "--out-dir",
+        "cdk.out",
+        "--baseline",
+        inputs.deploymentBaseline,
+        "--fail-on",
+        inputs.deploymentFailOn
+      ]);
+    }
+    if (inputs.policyFile) {
+      await runGuardrail("Infrastructure Policy Contract", [
+        "policy",
+        "check",
+        "--no-synth",
+        "--out-dir",
+        "cdk.out",
+        "--file",
+        inputs.policyFile
+      ]);
+    }
+    if (inputs.reliabilityCheck) {
+      await runGuardrail("Reliability Simulation", [
+        "simulate",
+        "--no-synth",
+        "--out-dir",
+        "cdk.out",
+        "--fail-on-high"
+      ]);
+    }
+    if (inputs.liveCheck) {
+      await runGuardrail("Live AWS Drift and Risk", [
+        "live",
+        "--no-synth",
+        "--out-dir",
+        "cdk.out",
+        "--fail-on",
+        inputs.liveFailOn
+      ]);
+    }
     const jsonFiles = findReportFiles(inputs.workingDirectory, "json");
     if (exitCode !== 0 && jsonFiles.length === 0) {
       const errorMsg = stderr.trim() || stdout.trim() || `cdk-insights exited with code ${exitCode}`;
@@ -100714,9 +100804,12 @@ async function run() {
       inputs.failOnClass,
       inputs.failOnPillars
     );
-    if (failReasons.length > 0) {
+    if (failReasons.length > 0 || guardrailFailures.length > 0) {
       setFailed(
-        `Analysis found blocking issues - ${failReasons.join("; ")}`
+        [
+          failReasons.length > 0 ? `Analysis found blocking issues - ${failReasons.join("; ")}` : "",
+          guardrailFailures.length > 0 ? `Guardrails failed: ${guardrailFailures.join(", ")}` : ""
+        ].filter(Boolean).join("; ")
       );
       return;
     }
