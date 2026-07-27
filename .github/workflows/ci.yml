@@ -110,6 +110,7 @@ jobs:
           stack-name: TestStack
           pr-comment: 'false'
           sarif-upload: 'false'
+          fail-on: 'critical'
 
       - name: Verify outputs
         env:
