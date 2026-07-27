@@ -24622,121 +24622,6 @@ var require_browser = __commonJS({
   }
 });
 
-// ../../../node_modules/has-flag/index.js
-var require_has_flag = __commonJS({
-  "../../../node_modules/has-flag/index.js"(exports2, module2) {
-    "use strict";
-    module2.exports = (flag, argv = process.argv) => {
-      const prefix2 = flag.startsWith("-") ? "" : flag.length === 1 ? "-" : "--";
-      const position = argv.indexOf(prefix2 + flag);
-      const terminatorPosition = argv.indexOf("--");
-      return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
-    };
-  }
-});
-
-// ../../../node_modules/supports-color/index.js
-var require_supports_color = __commonJS({
-  "../../../node_modules/supports-color/index.js"(exports2, module2) {
-    "use strict";
-    var os7 = require("os");
-    var tty = require("tty");
-    var hasFlag = require_has_flag();
-    var { env } = process;
-    var forceColor;
-    if (hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false") || hasFlag("color=never")) {
-      forceColor = 0;
-    } else if (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) {
-      forceColor = 1;
-    }
-    if ("FORCE_COLOR" in env) {
-      if (env.FORCE_COLOR === "true") {
-        forceColor = 1;
-      } else if (env.FORCE_COLOR === "false") {
-        forceColor = 0;
-      } else {
-        forceColor = env.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env.FORCE_COLOR, 10), 3);
-      }
-    }
-    function translateLevel(level) {
-      if (level === 0) {
-        return false;
-      }
-      return {
-        level,
-        hasBasic: true,
-        has256: level >= 2,
-        has16m: level >= 3
-      };
-    }
-    function supportsColor(haveStream, streamIsTTY) {
-      if (forceColor === 0) {
-        return 0;
-      }
-      if (hasFlag("color=16m") || hasFlag("color=full") || hasFlag("color=truecolor")) {
-        return 3;
-      }
-      if (hasFlag("color=256")) {
-        return 2;
-      }
-      if (haveStream && !streamIsTTY && forceColor === void 0) {
-        return 0;
-      }
-      const min = forceColor || 0;
-      if (env.TERM === "dumb") {
-        return min;
-      }
-      if (process.platform === "win32") {
-        const osRelease = os7.release().split(".");
-        if (Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
-          return Number(osRelease[2]) >= 14931 ? 3 : 2;
-        }
-        return 1;
-      }
-      if ("CI" in env) {
-        if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI", "GITHUB_ACTIONS", "BUILDKITE"].some((sign) => sign in env) || env.CI_NAME === "codeship") {
-          return 1;
-        }
-        return min;
-      }
-      if ("TEAMCITY_VERSION" in env) {
-        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env.TEAMCITY_VERSION) ? 1 : 0;
-      }
-      if (env.COLORTERM === "truecolor") {
-        return 3;
-      }
-      if ("TERM_PROGRAM" in env) {
-        const version3 = parseInt((env.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
-        switch (env.TERM_PROGRAM) {
-          case "iTerm.app":
-            return version3 >= 3 ? 3 : 2;
-          case "Apple_Terminal":
-            return 2;
-        }
-      }
-      if (/-256(color)?$/i.test(env.TERM)) {
-        return 2;
-      }
-      if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env.TERM)) {
-        return 1;
-      }
-      if ("COLORTERM" in env) {
-        return 1;
-      }
-      return min;
-    }
-    function getSupportLevel(stream4) {
-      const level = supportsColor(stream4, stream4 && stream4.isTTY);
-      return translateLevel(level);
-    }
-    module2.exports = {
-      supportsColor: getSupportLevel,
-      stdout: translateLevel(supportsColor(true, tty.isatty(1))),
-      stderr: translateLevel(supportsColor(true, tty.isatty(2)))
-    };
-  }
-});
-
 // node_modules/debug/src/node.js
 var require_node = __commonJS({
   "node_modules/debug/src/node.js"(exports2, module2) {
@@ -24755,7 +24640,7 @@ var require_node = __commonJS({
     );
     exports2.colors = [6, 2, 3, 4, 5, 1];
     try {
-      const supportsColor = require_supports_color();
+      const supportsColor = require("supports-color");
       if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
         exports2.colors = [
           20,
@@ -29625,7 +29510,7 @@ var require_BufferList = __commonJS({
         this.head = this.tail = null;
         this.length = 0;
       };
-      BufferList.prototype.join = function join3(s) {
+      BufferList.prototype.join = function join4(s) {
         if (this.length === 0) return "";
         var p = this.head;
         var ret = "" + p.data;
@@ -95769,7 +95654,7 @@ var SAFE_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 var SAFE_SERVICE_PATTERN = /^[a-zA-Z0-9]+$/;
 var SAFE_RULE_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 var SAFE_VERSION_PATTERN = /^(latest|\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?)$/;
-var DEFAULT_CDK_INSIGHTS_VERSION = "1.60.1";
+var DEFAULT_CDK_INSIGHTS_VERSION = "1.61.0";
 function validateInput(value, pattern, label) {
   if (!value) return;
   if (value.startsWith("-")) {
@@ -95817,6 +95702,13 @@ function parseInputs() {
     setSecret(githubToken);
   }
   const cdkInsightsVersion = getInput("cdk-insights-version") || DEFAULT_CDK_INSIGHTS_VERSION;
+  const deploymentPreview = getBooleanInput("deployment-preview");
+  const deploymentBaseline = getInput("deployment-baseline") || ".cdk-insights-template-baseline.json";
+  const deploymentFailOn = getInput("deployment-fail-on") || "block";
+  const policyFile = getInput("policy-file");
+  const reliabilityCheck = getBooleanInput("reliability-check");
+  const liveCheck = getBooleanInput("live-check");
+  const liveFailOn = getInput("live-fail-on") || "never";
   const failOnInput = getInput("fail-on");
   const failOn = failOnInput ? failOnInput.split(",").map((s) => s.trim().toLowerCase()) : [];
   const failOnPillarsInput = (getInput("fail-on-pillars") || "security").trim().toLowerCase();
@@ -95874,6 +95766,16 @@ function parseInputs() {
     "cdk-insights-version"
   );
   validateWorkingDirectory(workingDirectory);
+  validateWorkingDirectory(path6.join(workingDirectory, deploymentBaseline));
+  if (policyFile) {
+    validateWorkingDirectory(path6.join(workingDirectory, policyFile));
+  }
+  if (!["never", "review", "block"].includes(deploymentFailOn)) {
+    throw new Error(`Invalid deployment-fail-on: ${deploymentFailOn}`);
+  }
+  if (!["never", "drift", "risk"].includes(liveFailOn)) {
+    throw new Error(`Invalid live-fail-on: ${liveFailOn}`);
+  }
   const validSeverities = ["critical", "high", "medium", "low"];
   for (const severity of failOn) {
     if (!validSeverities.includes(severity)) {
@@ -95908,6 +95810,10 @@ function parseInputs() {
     info(`  Rule Filter: ${ruleFilter.join(", ")}`);
   }
   info(`  CDK Insights Version: ${cdkInsightsVersion}`);
+  info(`  Deployment Preview: ${deploymentPreview}`);
+  info(`  Policy Contract: ${policyFile || "(off)"}`);
+  info(`  Reliability Check: ${reliabilityCheck}`);
+  info(`  Live AWS Check: ${liveCheck}`);
   return {
     licenseKey,
     workingDirectory,
@@ -95924,7 +95830,14 @@ function parseInputs() {
     githubToken,
     services,
     ruleFilter,
-    cdkInsightsVersion
+    cdkInsightsVersion,
+    deploymentPreview,
+    deploymentBaseline,
+    deploymentFailOn,
+    policyFile,
+    reliabilityCheck,
+    liveCheck,
+    liveFailOn
   };
 }
 
@@ -100528,6 +100441,7 @@ async function uploadSarifToCodeScanning(sarifPaths, token) {
 
 // src/main.ts
 var AI_MODEL_FLAG_MIN_VERSION = "1.60.0";
+var INTELLIGENCE_COMMANDS_MIN_VERSION = "1.61.0";
 async function resolveVersion(version3) {
   if (version3 !== "latest") return version3;
   let stdout = "";
@@ -100604,6 +100518,12 @@ async function run() {
         `The ai-model input requires cdk-insights >= ${AI_MODEL_FLAG_MIN_VERSION}; resolved ${resolvedVersion}. Remove the version pin or clear ai-model.`
       );
     }
+    const intelligenceEnabled = inputs.deploymentPreview || !!inputs.policyFile || inputs.reliabilityCheck || inputs.liveCheck;
+    if (intelligenceEnabled && !versionGte(resolvedVersion, INTELLIGENCE_COMMANDS_MIN_VERSION)) {
+      throw new Error(
+        `Deployment intelligence inputs require cdk-insights >= ${INTELLIGENCE_COMMANDS_MIN_VERSION}; resolved ${resolvedVersion}.`
+      );
+    }
     if (inputs.aiAnalysis && !inputs.licenseKey) {
       warning(
         "AI analysis requested but no license key provided - using static analysis only"
@@ -100628,6 +100548,61 @@ async function run() {
     );
     logAnalysisOutput(stdout, stderr);
     endGroup();
+    const guardrailFailures = [];
+    const runGuardrail = async (label, command) => {
+      startGroup(label);
+      info(`Command: cdk-insights ${command.join(" ")}`);
+      const result = await runAnalysis(
+        command,
+        inputs.workingDirectory,
+        inputs.licenseKey
+      );
+      logAnalysisOutput(result.stdout, result.stderr);
+      endGroup();
+      if (result.exitCode !== 0) guardrailFailures.push(label);
+    };
+    if (inputs.deploymentPreview) {
+      await runGuardrail("Deployment Risk Preview", [
+        "preview",
+        "--no-synth",
+        "--out-dir",
+        "cdk.out",
+        "--baseline",
+        inputs.deploymentBaseline,
+        "--fail-on",
+        inputs.deploymentFailOn
+      ]);
+    }
+    if (inputs.policyFile) {
+      await runGuardrail("Infrastructure Policy Contract", [
+        "policy",
+        "check",
+        "--no-synth",
+        "--out-dir",
+        "cdk.out",
+        "--file",
+        inputs.policyFile
+      ]);
+    }
+    if (inputs.reliabilityCheck) {
+      await runGuardrail("Reliability Simulation", [
+        "simulate",
+        "--no-synth",
+        "--out-dir",
+        "cdk.out",
+        "--fail-on-high"
+      ]);
+    }
+    if (inputs.liveCheck) {
+      await runGuardrail("Live AWS Drift and Risk", [
+        "live",
+        "--no-synth",
+        "--out-dir",
+        "cdk.out",
+        "--fail-on",
+        inputs.liveFailOn
+      ]);
+    }
     const jsonFiles = findReportFiles(inputs.workingDirectory, "json");
     if (exitCode !== 0 && jsonFiles.length === 0) {
       const errorMsg = stderr.trim() || stdout.trim() || `cdk-insights exited with code ${exitCode}`;
@@ -100714,9 +100689,12 @@ async function run() {
       inputs.failOnClass,
       inputs.failOnPillars
     );
-    if (failReasons.length > 0) {
+    if (failReasons.length > 0 || guardrailFailures.length > 0) {
       setFailed(
-        `Analysis found blocking issues - ${failReasons.join("; ")}`
+        [
+          failReasons.length > 0 ? `Analysis found blocking issues - ${failReasons.join("; ")}` : "",
+          guardrailFailures.length > 0 ? `Guardrails failed: ${guardrailFailures.join(", ")}` : ""
+        ].filter(Boolean).join("; ")
       );
       return;
     }

@@ -77,7 +77,14 @@ jobs:
 | `github-token` | Token used for SARIF upload to Code Scanning. | No | `${{ github.token }}` |
 | `services` | Filter analysis to specific AWS services (comma-separated, e.g. `S3,Lambda,IAM`). | No | (all services) |
 | `rule-filter` | Filter to specific rules (comma-separated rule IDs). | No | - |
-| `cdk-insights-version` | npm version of `cdk-insights` to install. Use `latest` or a semver string. Minimum supported: `1.44.1`. | No | `latest` |
+| `cdk-insights-version` | npm version of `cdk-insights` to install. Use `latest` or a semver string. Minimum supported: `1.44.1`. | No | `1.61.0` |
+| `deployment-preview` | Compare the synthesized assembly with a committed, known-good template baseline. Requires CLI 1.61.0+. | No | `false` |
+| `deployment-baseline` | Baseline created by `cdk-insights preview --write-baseline`. | No | `.cdk-insights-template-baseline.json` |
+| `deployment-fail-on` | Block at `never`, `review`, or `block` deployment recommendation. | No | `block` |
+| `policy-file` | Version-controlled infrastructure contract to enforce. Empty disables the policy guard. | No | - |
+| `reliability-check` | Review AZ, dependency, quota-pressure and regional-recovery weaknesses. | No | `false` |
+| `live-check` | Compare with deployed CloudFormation templates and existing drift results using the workflow AWS identity. | No | `false` |
+| `live-fail-on` | Live-state failure policy: `never`, `drift`, or `risk`. | No | `never` |
 
 ## Outputs
 
@@ -127,6 +134,36 @@ The default GLM 4.7 Flash model costs 0.5 credits per fresh resource and is avai
 ```
 
 AI scans every privacy-safe user resource rather than only resources with an existing static finding. Repeat scans of unchanged resources use cached results and cost 0 credits.
+
+### Deployment intelligence guardrails
+
+Create and review a template baseline on your main branch, then commit it:
+
+```bash
+npx cdk-insights preview --write-baseline
+git add .cdk-insights-template-baseline.json
+```
+
+The action synthesizes once, runs the normal security scan, and reuses the same `cdk.out` for each enabled guard:
+
+```yaml
+- uses: instancelabs/cdk-insights-action@v1
+  with:
+    cdk-insights-version: '1.61.0'
+    deployment-preview: true
+    deployment-fail-on: review
+    policy-file: .cdk-insights-policy.json
+    reliability-check: true
+```
+
+For a live-state comparison, configure AWS credentials earlier in the job and grant only `cloudformation:GetTemplate`, `cloudformation:DescribeStacks`, and `cloudformation:DescribeStackResourceDrifts`:
+
+```yaml
+    live-check: true
+    live-fail-on: drift
+```
+
+The action never starts drift detection and never mutates AWS resources.
 
 ### Static-Only with License Key
 
@@ -400,7 +437,7 @@ When `pr-comment: true` (default), the action posts a summary like:
 | **Free** (no signup) | £0 | Static analysis (145 rules), all six CLI output views, multi-stack analysis |
 | **Free** (signed-up) | £0 | Everything above + **500 AI credits/month**, using GLM 4.7 Flash or Nova Lite |
 | **Pro** | £15/mo | Everything in Free + all five Bedrock models, dashboard, PDF reports, **10,000 AI credits/month** |
-| **Team** | £12/seat/mo (2-seat minimum) | Everything in Pro + team management, shared configs, audit trails, **20,000 AI credits per seat/month** |
+| **Team** | £12.99/seat/mo (2-seat minimum) | Everything in Pro + team management, shared configs, audit trails, **20,000 AI credits per seat/month** |
 
 Static analysis is **free forever** - no signup, no credit card. AI analysis requires a license key (free account or paid). There are no automatic overage charges: AI pauses when the allowance is exhausted while static analysis continues, then AI resumes at renewal.
 

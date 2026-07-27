@@ -99,7 +99,42 @@ inputs:
   cdk-insights-version:
     description: 'Specific cdk-insights version to use (defaults to the release tested with this action; use latest only to opt into automatic upgrades)'
     required: false
-    default: '1.60.1'
+    default: '1.61.0'
+
+  deployment-preview:
+    description: 'Compare cdk.out with a committed known-good template baseline (CLI 1.61.0+)'
+    required: false
+    default: 'false'
+
+  deployment-baseline:
+    description: 'Path to the deployment baseline created by cdk-insights preview --write-baseline'
+    required: false
+    default: '.cdk-insights-template-baseline.json'
+
+  deployment-fail-on:
+    description: 'Deployment recommendation that blocks the workflow: never, review, or block'
+    required: false
+    default: 'block'
+
+  policy-file:
+    description: 'Optional policy contract path to enforce with cdk-insights policy check (CLI 1.61.0+)'
+    required: false
+    default: ''
+
+  reliability-check:
+    description: 'Run static AZ, dependency, quota, and regional reliability simulation (CLI 1.61.0+)'
+    required: false
+    default: 'false'
+
+  live-check:
+    description: 'Read CloudFormation templates and existing drift results using the workflow AWS identity (CLI 1.61.0+)'
+    required: false
+    default: 'false'
+
+  live-fail-on:
+    description: 'Live check failure policy: never, drift, or risk'
+    required: false
+    default: 'never'
 
 outputs:
   total-issues:

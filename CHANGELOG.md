@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.3
+
+- Added optional deployment preview, policy, reliability, and live-state guardrails.
+- Updated the bundled default CLI to 1.61.0 for infrastructure intelligence commands.
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
