@@ -436,7 +436,7 @@ When `pr-comment: true` (default), the action posts a summary like:
 |------|-------|-----------------|
 | **Free** (no signup) | £0 | Static analysis (145 rules), all six CLI output views, multi-stack analysis |
 | **Free** (signed-up) | £0 | Everything above + **500 AI credits/month**, using GLM 4.7 Flash or Nova Lite |
-| **Pro** | £15/mo | Everything in Free + all five Bedrock models, dashboard, PDF reports, **10,000 AI credits/month** |
+| **Pro** | £9.99/mo | Everything in Free + all five Bedrock models, dashboard, PDF reports, **10,000 AI credits/month** |
 | **Team** | £12.99/seat/mo (2-seat minimum) | Everything in Pro + team management, shared configs, audit trails, **20,000 AI credits per seat/month** |
 
 Static analysis is **free forever** - no signup, no credit card. AI analysis requires a license key (free account or paid). There are no automatic overage charges: AI pauses when the allowance is exhausted while static analysis continues, then AI resumes at renewal.
