@@ -1,14 +1,35 @@
 # Changelog
 
-## 1.6.3
-
-- Added optional deployment preview, policy, reliability, and live-state guardrails.
-- Updated the bundled default CLI to 1.61.0 for infrastructure intelligence commands.
-
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.6.5] - 2026-08-12
+
+### Changed
+
+- Updated generated CLI arguments to use the canonical kebab-case option names while remaining compatible with supported CLI versions.
+- Added a contract test that rejects camelCase flags from future Action-generated command lines.
+- Rebuilt the committed Action bundle with the canonical arguments.
+
+## [1.6.4] - 2026-08-11
+
+### Security
+
+- Hardened command execution and environment handling at the CI trust boundary.
+- Redacted sensitive subprocess output and validated user-controlled inputs.
+- Refreshed audited dependencies and rebuilt the committed Action bundle.
+
+## [1.6.3] - 2026-07-27
+
+### Added
+
+- Added optional deployment preview, policy, reliability, and live-state guardrails.
+
+### Changed
+
+- Updated the bundled default CLI to 1.61.0 for infrastructure intelligence commands.
 
 ## [1.6.2] - 2026-07-26
 

@@ -56264,7 +56264,7 @@ function logAnalysisOutput(stdout, stderr) {
 function buildScanArgs(inputs, extraReports = []) {
   const args = ["scan"];
   args.push("--yes");
-  args.push("--no-failOnCritical");
+  args.push("--no-fail-on-critical");
   args.push("--warn-sensitive");
   if (!inputs.aiAnalysis && inputs.licenseKey) {
     args.push("--local");
@@ -56273,13 +56273,13 @@ function buildScanArgs(inputs, extraReports = []) {
     args.push("--model", inputs.aiModel);
   }
   if (inputs.prComment) {
-    args.push("--prComment");
+    args.push("--pr-comment");
   }
   if (inputs.services.length > 0) {
     args.push("--services", ...inputs.services);
   }
   if (inputs.ruleFilter.length > 0) {
-    args.push("--ruleFilter", ...inputs.ruleFilter);
+    args.push("--rule-filter", ...inputs.ruleFilter);
   }
   args.push("--format", "json");
   if (extraReports.length > 0) {
@@ -56298,7 +56298,7 @@ function appendStackSelection(args, inputs) {
 function buildSarifArgs(inputs) {
   const args = ["scan"];
   args.push("--yes");
-  args.push("--no-failOnCritical");
+  args.push("--no-fail-on-critical");
   args.push("--warn-sensitive");
   if (!inputs.aiAnalysis && inputs.licenseKey) {
     args.push("--local");

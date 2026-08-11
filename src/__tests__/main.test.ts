@@ -38,14 +38,32 @@ describe('buildScanArgs', () => {
     expect(args).toContain('scan');
     expect(args).toContain('--all');
     expect(args).toContain('--yes');
-    expect(args).toContain('--no-failOnCritical');
+    expect(args).toContain('--no-fail-on-critical');
     expect(args).toContain('--warn-sensitive');
-    expect(args).toContain('--prComment');
+    expect(args).toContain('--pr-comment');
     // --format json is emitted; stack selection (--all) is LAST so the
     // flags before it aren't swallowed by the `--` separator.
     const fmtIdx = args.indexOf('--format');
     expect(args[fmtIdx + 1]).toBe('json');
     expect(args[args.length - 1]).toBe('--all');
+  });
+
+  it('emits public CLI flags in kebab-case', () => {
+    const args = buildScanArgs(
+      defaultInputs({
+        aiModel: 'haiku-4-5',
+        ruleFilter: ['Security'],
+        services: ['S3'],
+      }),
+      ['sarif', 'markdown'],
+    );
+    const flags = args.filter(
+      (argument) => argument.startsWith('--') && argument !== '--',
+    );
+
+    for (const flag of flags) {
+      expect(flag).toMatch(/^--[a-z0-9]+(?:-[a-z0-9]+)*$/);
+    }
   });
 
   it('uses -- separator and stack name instead of --all when provided', () => {
@@ -65,7 +83,7 @@ describe('buildScanArgs', () => {
     const ddIdx = args.indexOf('--');
     for (const flag of [
       '--yes',
-      '--no-failOnCritical',
+      '--no-fail-on-critical',
       '--warn-sensitive',
       '--format',
       '--reports',
@@ -78,10 +96,10 @@ describe('buildScanArgs', () => {
     expect(args.slice(ddIdx)).toEqual(['--', 'MyStack']);
   });
 
-  it('does not include --prComment when disabled', () => {
+  it('does not include --pr-comment when disabled', () => {
     const args = buildScanArgs(defaultInputs({ prComment: false }));
 
-    expect(args).not.toContain('--prComment');
+    expect(args).not.toContain('--pr-comment');
   });
 
   it('passes --local when license key provided but ai-analysis is false', () => {
@@ -131,14 +149,14 @@ describe('buildScanArgs', () => {
     expect(args[servicesIdx + 3]).toBe('IAM');
   });
 
-  it('passes ruleFilter as individual args', () => {
+  it('passes --rule-filter values as individual args', () => {
     const args = buildScanArgs(
       defaultInputs({
         ruleFilter: ['RULE-001', 'RULE-002'],
       }),
     );
 
-    const filterIdx = args.indexOf('--ruleFilter');
+    const filterIdx = args.indexOf('--rule-filter');
     expect(filterIdx).toBeGreaterThan(-1);
     expect(args[filterIdx + 1]).toBe('RULE-001');
     expect(args[filterIdx + 2]).toBe('RULE-002');
@@ -150,10 +168,10 @@ describe('buildScanArgs', () => {
     expect(args).not.toContain('--services');
   });
 
-  it('omits --ruleFilter when empty', () => {
+  it('omits --rule-filter when empty', () => {
     const args = buildScanArgs(defaultInputs({ ruleFilter: [] }));
 
-    expect(args).not.toContain('--ruleFilter');
+    expect(args).not.toContain('--rule-filter');
   });
 
   it('never includes --ai flag', () => {
@@ -187,10 +205,10 @@ describe('buildScanArgs', () => {
     expect(args).not.toContain('--model');
   });
 
-  it('never includes --outputFile flag', () => {
+  it('never includes --output-file flag', () => {
     const args = buildScanArgs(defaultInputs());
 
-    expect(args).not.toContain('--outputFile');
+    expect(args).not.toContain('--output-file');
   });
 
   it('omits --reports when no extra reports requested', () => {
@@ -218,7 +236,7 @@ describe('buildSarifArgs', () => {
     expect(args).toContain('scan');
     expect(args).toContain('--all');
     expect(args).toContain('--yes');
-    expect(args).toContain('--no-failOnCritical');
+    expect(args).toContain('--no-fail-on-critical');
     expect(args).toContain('--warn-sensitive');
     const fmtIdx = args.indexOf('--format');
     expect(args[fmtIdx + 1]).toBe('sarif');
@@ -243,7 +261,7 @@ describe('buildSarifArgs', () => {
       }),
     );
 
-    expect(args).not.toContain('--prComment');
+    expect(args).not.toContain('--pr-comment');
     expect(args).not.toContain('--services');
   });
 
