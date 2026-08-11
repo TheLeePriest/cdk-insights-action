@@ -24,8 +24,8 @@ export function buildScanArgs(
   // Skip interactive prompts in CI
   args.push('--yes');
 
-  // Disable CLI's built-in failOnCritical so the action controls failure
-  args.push('--no-failOnCritical');
+  // Disable the CLI's built-in critical-severity gate so the action controls failure.
+  args.push('--no-fail-on-critical');
 
   // Allow analysis to continue when sensitive data is detected (the action
   // controls failure via the fail-on input). Without this flag the CLI exits
@@ -44,7 +44,7 @@ export function buildScanArgs(
 
   // PR comment (uses gh CLI, which auto-authenticates via GITHUB_TOKEN in GitHub Actions)
   if (inputs.prComment) {
-    args.push('--prComment');
+    args.push('--pr-comment');
   }
 
   // Services filter (yargs array type - pass as individual args)
@@ -54,7 +54,7 @@ export function buildScanArgs(
 
   // Rule filter (yargs array type - pass as individual args)
   if (inputs.ruleFilter.length > 0) {
-    args.push('--ruleFilter', ...inputs.ruleFilter);
+    args.push('--rule-filter', ...inputs.ruleFilter);
   }
 
   // Output as JSON (CLI auto-generates {stackName}_analysis_report.json).
@@ -102,7 +102,7 @@ export function buildSarifArgs(inputs: ActionInputs): string[] {
   const args: string[] = ['scan'];
 
   args.push('--yes');
-  args.push('--no-failOnCritical');
+  args.push('--no-fail-on-critical');
   args.push('--warn-sensitive');
 
   // Match the primary run's AI/static decision so the SARIF reflects the
