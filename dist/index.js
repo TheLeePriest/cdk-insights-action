@@ -25598,7 +25598,7 @@ var require_commonjs4 = __commonJS({
       }
       return out;
     }
-    function expandSequence(body2, isAlphaSequence, max) {
+    function expandSequence(body2, isAlphaSequence, max, maxLength) {
       const n = body2.split(/\.\./);
       const N = [];
       if (n[0] === void 0 || n[1] === void 0) {
@@ -25615,6 +25615,7 @@ var require_commonjs4 = __commonJS({
         test = gte;
       }
       const pad = n.some(isPadded);
+      let length = 0;
       for (let i = x; test(i, y) && N.length < max; i += incr) {
         let c;
         if (isAlphaSequence) {
@@ -25636,7 +25637,10 @@ var require_commonjs4 = __commonJS({
             }
           }
         }
+        if (length + c.length > maxLength)
+          break;
         N.push(c);
+        length += c.length;
       }
       return N;
     }
@@ -25676,7 +25680,7 @@ var require_commonjs4 = __commonJS({
         }
         let values;
         if (isSequence) {
-          values = expandSequence(m.body, isAlphaSequence, max);
+          values = expandSequence(m.body, isAlphaSequence, max, maxLength);
         } else {
           let n = parseCommaParts(m.body);
           if (n.length === 1 && n[0] !== void 0) {
@@ -25689,9 +25693,26 @@ var require_commonjs4 = __commonJS({
               continue;
             }
           }
+          let dropsEmpties = dropEmpties && !m.post.length && !pre;
+          for (let d = 0; dropsEmpties && d < acc.length; d++) {
+            if (acc[d]) {
+              dropsEmpties = false;
+            }
+          }
           values = [];
-          for (let j = 0; j < n.length; j++) {
-            values.push.apply(values, expand_(n[j], max, maxLength, false));
+          let valuesLength = 0;
+          outer: for (let j = 0; j < n.length; j++) {
+            const expanded = expand_(n[j], max, maxLength, false);
+            for (let k = 0; k < expanded.length; k++) {
+              const v = expanded[k];
+              if (dropsEmpties && !v)
+                continue;
+              if (values.length >= max || valuesLength + v.length > maxLength) {
+                break outer;
+              }
+              values.push(v);
+              valuesLength += v.length;
+            }
           }
         }
         acc = combine(acc, pre, values, max, maxLength, dropEmpties && !m.post.length);
@@ -99885,93 +99906,12 @@ var coerce = {
 };
 var NEVER = INVALID;
 
-// node_modules/@instance-labs/cdk-insights-contract/dist/index.js
-var SeveritySchema = external_exports.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]);
-var WafPillarSchema = external_exports.enum([
-  "Security",
-  "Operational Excellence",
-  "Cost Optimization",
-  "Reliability",
-  "Performance Efficiency",
-  "Sustainability"
-]);
-var FindingClassSchema = external_exports.enum([
-  "security",
-  "best-practice",
-  "compliance"
-]);
-var ClaimKindSchema = external_exports.enum([
-  "property-absent",
-  "property-present",
-  "property-equals",
-  "property-not-equals"
-]);
-var ClaimValueSchema = external_exports.union([
-  external_exports.string(),
-  external_exports.number(),
-  external_exports.boolean(),
-  external_exports.array(external_exports.union([external_exports.string(), external_exports.number(), external_exports.boolean()]))
-]);
-var WireVerifiableClaimSchema = external_exports.object({
-  kind: ClaimKindSchema,
-  path: external_exports.string(),
-  value: external_exports.unknown().optional()
-});
-var WireFindingSchema = external_exports.object({
-  issue: external_exports.string(),
-  recommendation: external_exports.string(),
-  codeSnippet: external_exports.string().optional(),
-  wafPillar: WafPillarSchema,
-  severity: SeveritySchema,
-  findingClass: FindingClassSchema.optional(),
-  crossResource: external_exports.boolean().optional(),
-  confidence: external_exports.number().int().min(1).max(10),
-  verifiableClaim: WireVerifiableClaimSchema.optional()
-});
-var AnalysisResultSchema = external_exports.object({
-  resourceId: external_exports.string().describe("Must equal the resourceId given in the prompt, unchanged."),
-  resourceName: external_exports.string().optional(),
-  issues: external_exports.array(WireFindingSchema)
-});
+// src/analysisReportSchema.ts
 var ANALYSIS_REPORT_SCHEMA_VERSION = "1.0.0";
-var SourceLocationSchema = external_exports.object({
-  filePath: external_exports.string(),
-  line: external_exports.number().int().nonnegative(),
-  column: external_exports.number().int().nonnegative(),
-  confidence: external_exports.enum(["high", "medium", "low"]).optional()
-}).passthrough();
-var AnalysisReportIssueSchema = external_exports.object({
-  issue: external_exports.string().min(1),
-  recommendation: external_exports.string().optional(),
-  severity: SeveritySchema,
-  wafPillar: WafPillarSchema.optional(),
-  findingClass: FindingClassSchema.optional(),
-  foundBy: external_exports.enum(["cdkInsights", "cdkNag", "validationReport"]).optional(),
-  ruleId: external_exports.string().optional(),
-  aiConfidence: external_exports.number().int().min(1).max(10).optional(),
-  crossResource: external_exports.boolean().optional(),
-  sourceLocation: SourceLocationSchema.optional(),
-  verifiableClaim: WireVerifiableClaimSchema.optional(),
-  validation: external_exports.object({
-    verdict: external_exports.enum([
-      "confirmed",
-      "refuted",
-      "stage-gated",
-      "unverifiable"
-    ]),
-    conditionName: external_exports.string().optional(),
-    note: external_exports.string().optional()
-  }).optional()
-}).passthrough();
-var AnalysisReportRecommendationSchema = external_exports.object({
-  resourceId: external_exports.string().min(1),
-  logicalId: external_exports.string().optional(),
-  issues: external_exports.array(AnalysisReportIssueSchema)
-}).passthrough();
 var CompatibleAnalysisReportIssueSchema = external_exports.object({
   issue: external_exports.string().min(1),
   recommendation: external_exports.string().optional(),
-  severity: SeveritySchema,
+  severity: external_exports.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]),
   wafPillar: external_exports.string().optional(),
   findingClass: external_exports.string().optional(),
   foundBy: external_exports.string().optional()
@@ -99980,16 +99920,6 @@ var CompatibleAnalysisReportRecommendationSchema = external_exports.object({
   resourceId: external_exports.string().min(1),
   logicalId: external_exports.string().optional(),
   issues: external_exports.array(CompatibleAnalysisReportIssueSchema)
-}).passthrough();
-var AnalysisReportSummarySchema = external_exports.object({
-  totalIssues: external_exports.number().int().nonnegative(),
-  totalResources: external_exports.number().int().nonnegative(),
-  severityCounts: external_exports.object({
-    CRITICAL: external_exports.number().int().nonnegative(),
-    HIGH: external_exports.number().int().nonnegative(),
-    MEDIUM: external_exports.number().int().nonnegative(),
-    LOW: external_exports.number().int().nonnegative()
-  }).optional()
 }).passthrough();
 var CompatibleAnalysisReportSummarySchema = external_exports.object({
   totalIssues: external_exports.number().int().nonnegative().optional(),
@@ -100001,15 +99931,6 @@ var CompatibleAnalysisReportSummarySchema = external_exports.object({
     LOW: external_exports.number().int().nonnegative().optional()
   }).optional()
 }).passthrough();
-var AnalysisReportSchema = external_exports.object({
-  /** Defaults only while reading reports produced before schema versioning. */
-  schemaVersion: external_exports.literal(ANALYSIS_REPORT_SCHEMA_VERSION).default(ANALYSIS_REPORT_SCHEMA_VERSION),
-  stackName: external_exports.string().min(1),
-  generatedAt: external_exports.string().datetime(),
-  version: external_exports.string().min(1),
-  summary: AnalysisReportSummarySchema,
-  recommendations: external_exports.array(AnalysisReportRecommendationSchema)
-}).passthrough();
 var CompatibleAnalysisReportSchema = external_exports.object({
   schemaVersion: external_exports.literal(ANALYSIS_REPORT_SCHEMA_VERSION).optional(),
   stackName: external_exports.string().min(1).optional(),
@@ -100019,181 +99940,6 @@ var CompatibleAnalysisReportSchema = external_exports.object({
   recommendations: external_exports.array(CompatibleAnalysisReportRecommendationSchema).optional()
 }).passthrough().refine((report) => report.summary || report.recommendations, {
   message: "Report must contain summary or recommendations"
-});
-var EVENT_SCHEMA_VERSION = "1.0.0";
-var FeedbackRatingSchema = external_exports.enum([
-  "helpful",
-  "not_helpful",
-  "incorrect"
-]);
-var FeedbackSubmittedDetailSchema = external_exports.object({
-  schemaVersion: external_exports.literal(EVENT_SCHEMA_VERSION).default(EVENT_SCHEMA_VERSION),
-  feedbackId: external_exports.string().min(1).optional(),
-  findingId: external_exports.string().min(1),
-  patternId: external_exports.string().min(1),
-  resourceType: external_exports.string().min(1),
-  rating: FeedbackRatingSchema,
-  originalRating: external_exports.enum(["helpful", "actionable", "not_helpful", "inaccurate"]).optional(),
-  correction: external_exports.string().max(500).nullable().optional(),
-  timestamp: external_exports.union([external_exports.string().datetime(), external_exports.number().int().nonnegative()]),
-  ownerId: external_exports.string().min(1).optional(),
-  resourceId: external_exports.string().optional(),
-  issueSnippet: external_exports.string().max(200).optional(),
-  wafPillar: external_exports.string().optional(),
-  severity: external_exports.string().optional(),
-  modelId: external_exports.string().optional(),
-  clientTimestamp: external_exports.number().int().nonnegative().optional()
-}).passthrough();
-var ScanUploadedPreviousScanSchema = external_exports.object({
-  scanId: external_exports.string().uuid(),
-  s3Key: external_exports.string().min(1),
-  createdAt: external_exports.string().datetime(),
-  stackNames: external_exports.array(external_exports.string())
-});
-var ScanUploadedDetailSchema = external_exports.object({
-  eventSchemaVersion: external_exports.literal(EVENT_SCHEMA_VERSION).default(EVENT_SCHEMA_VERSION),
-  scanId: external_exports.string().uuid(),
-  hashedLicenseId: external_exports.string().regex(/^[0-9a-f]{32}$/),
-  tier: external_exports.string().min(1),
-  schemaVersion: external_exports.string().min(1),
-  stackNames: external_exports.array(external_exports.string()),
-  s3Bucket: external_exports.string().min(1),
-  s3Key: external_exports.string().min(1),
-  createdAt: external_exports.string().datetime(),
-  scanCompletedAt: external_exports.string().datetime(),
-  previousScans: external_exports.array(ScanUploadedPreviousScanSchema).max(5)
-});
-var SUPPORTED_SCAN_REPORT_SCHEMA_VERSIONS = [
-  "1.0.0",
-  "1.1.0",
-  "1.2.0"
-];
-var ScanSeverityCountsSchema = external_exports.record(
-  SeveritySchema,
-  external_exports.number().int().nonnegative()
-);
-var ScanWafPillarCountsSchema = external_exports.record(
-  WafPillarSchema,
-  external_exports.number().int().nonnegative()
-);
-var ScanSourceLocationSchema = external_exports.object({
-  filePath: external_exports.string().min(1).max(1024),
-  line: external_exports.number().int().nonnegative(),
-  column: external_exports.number().int().nonnegative(),
-  confidence: external_exports.enum(["high", "medium", "low"]),
-  endLine: external_exports.number().int().nonnegative().optional(),
-  endColumn: external_exports.number().int().nonnegative().optional()
-});
-var ScanFindingSchema = external_exports.object({
-  issue: external_exports.string().min(1).max(8192),
-  recommendation: external_exports.string().max(8192).optional(),
-  severity: SeveritySchema,
-  wafPillar: WafPillarSchema,
-  foundBy: external_exports.enum(["cdkInsights", "cdkNag", "validationReport"]),
-  validationPluginName: external_exports.string().max(256).optional(),
-  seenInSynth: external_exports.boolean().optional(),
-  ruleId: external_exports.string().min(1).max(80).optional(),
-  codeSnippet: external_exports.string().max(4096).optional(),
-  constructPath: external_exports.string().max(1024).optional(),
-  constructType: external_exports.string().max(256).optional(),
-  sourceLocation: ScanSourceLocationSchema.optional(),
-  aiConfidence: external_exports.number().int().min(1).max(10).optional(),
-  findingFingerprint: external_exports.string().max(1600).optional(),
-  costImpact: external_exports.object({
-    monthlyLowUsd: external_exports.number().nonnegative(),
-    monthlyHighUsd: external_exports.number().nonnegative(),
-    currency: external_exports.literal("USD"),
-    confidence: external_exports.enum(["low", "medium", "high"]),
-    assumptions: external_exports.array(external_exports.string().min(1).max(500)).max(20)
-  }).refine((value) => value.monthlyHighUsd >= value.monthlyLowUsd, {
-    message: "monthlyHighUsd must be at least monthlyLowUsd"
-  }).optional()
-});
-var ScanImpactGraphSchema = external_exports.object({
-  nodes: external_exports.array(
-    external_exports.object({
-      stackName: external_exports.string().min(1).max(128),
-      resourceId: external_exports.string().min(1).max(256),
-      logicalId: external_exports.string().max(256).optional(),
-      constructType: external_exports.string().max(256).optional(),
-      directDependents: external_exports.number().int().nonnegative(),
-      transitiveDependents: external_exports.number().int().nonnegative(),
-      criticality: external_exports.enum(["low", "medium", "high", "critical"])
-    })
-  ).max(1e4),
-  edges: external_exports.array(
-    external_exports.object({
-      stackName: external_exports.string().min(1).max(128),
-      from: external_exports.string().min(1).max(256),
-      to: external_exports.string().min(1).max(256),
-      kind: external_exports.literal("dependsOn")
-    })
-  ).max(1e5)
-});
-var ScanSuppressionContextSchema = external_exports.object({
-  ignoreRules: external_exports.array(external_exports.string().min(1).max(256)).max(500),
-  ignorePaths: external_exports.array(external_exports.string().min(1).max(1024)).max(500),
-  baselineFingerprints: external_exports.array(external_exports.string().min(1).max(1600)).max(1e4),
-  acknowledgedRules: external_exports.array(
-    external_exports.object({
-      ruleId: external_exports.string().min(1).max(80),
-      constructPath: external_exports.string().max(1024).optional()
-    })
-  ).max(1e3)
-});
-var ScanResourceSchema = external_exports.object({
-  resourceId: external_exports.string().min(1).max(256),
-  logicalId: external_exports.string().max(256).optional(),
-  cdkPath: external_exports.string().max(1024).optional(),
-  friendlyName: external_exports.string().max(256).optional(),
-  resourceName: external_exports.string().max(256).optional(),
-  constructType: external_exports.string().max(256).optional(),
-  serviceCategory: external_exports.string().max(64).optional(),
-  tags: external_exports.record(external_exports.string(), external_exports.string()).optional(),
-  sourceLocation: ScanSourceLocationSchema.optional(),
-  findings: external_exports.array(ScanFindingSchema).max(500)
-});
-var ScanStackSchema = external_exports.object({
-  stackName: external_exports.string().min(1).max(128),
-  stackId: external_exports.string().max(256).optional(),
-  totalResources: external_exports.number().int().nonnegative(),
-  scannedResourceIds: external_exports.array(external_exports.string().min(1).max(256)).max(1e4),
-  severityCounts: ScanSeverityCountsSchema,
-  wafPillarCounts: ScanWafPillarCountsSchema,
-  resources: external_exports.array(ScanResourceSchema).max(1e4)
-});
-var ScanTotalsSchema = external_exports.object({
-  totalResources: external_exports.number().int().nonnegative(),
-  totalFindings: external_exports.number().int().nonnegative(),
-  resourcesWithFindings: external_exports.number().int().nonnegative(),
-  severityCounts: ScanSeverityCountsSchema,
-  wafPillarCounts: ScanWafPillarCountsSchema
-});
-var ScanReportSchema = external_exports.object({
-  schemaVersion: external_exports.enum(SUPPORTED_SCAN_REPORT_SCHEMA_VERSIONS),
-  scanId: external_exports.string().uuid(),
-  cliVersion: external_exports.string().min(1).max(40),
-  scanStartedAt: external_exports.string().datetime(),
-  scanCompletedAt: external_exports.string().datetime(),
-  aiAnalysis: external_exports.object({
-    ran: external_exports.boolean(),
-    skippedReason: external_exports.enum(["cap-reached", "auth", "local-mode", "unavailable"]).optional()
-  }),
-  stacks: external_exports.array(ScanStackSchema).max(200),
-  totals: ScanTotalsSchema,
-  suppressions: ScanSuppressionContextSchema.optional(),
-  impactGraph: ScanImpactGraphSchema.optional()
-});
-var ScanReportEnvelopeSchema = external_exports.object({
-  schemaVersion: external_exports.enum(SUPPORTED_SCAN_REPORT_SCHEMA_VERSIONS),
-  scanId: external_exports.string().uuid(),
-  hashedLicenseId: external_exports.string().regex(/^[0-9a-f]{32}$/, "hashedLicenseId must be a 32-char hex digest"),
-  tier: external_exports.string().min(1).max(20),
-  cliVersion: external_exports.string().min(1).max(40),
-  platform: external_exports.string().min(1).max(20),
-  scanStartedAt: external_exports.string().datetime(),
-  scanCompletedAt: external_exports.string().datetime(),
-  report: ScanReportSchema
 });
 
 // src/outputs.ts

@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as core from '@actions/core';
-import { CompatibleAnalysisReportSchema } from '@instance-labs/cdk-insights-contract';
+import { CompatibleAnalysisReportSchema } from './analysisReportSchema';
 import type { FindingClassKey, PillarKey } from './inputs';
 
 type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
