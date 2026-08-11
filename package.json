@@ -1,13 +1,13 @@
 {
   "name": "cdk-insights-action",
-  "version": "1.6.3",
+  "version": "1.6.4",
   "engines": {
     "node": ">=24"
   },
   "description": "GitHub Action for CDK Insights - Analyze AWS CDK infrastructure for security, cost, and best practices",
   "main": "dist/index.js",
   "scripts": {
-    "build": "esbuild src/main.ts --bundle --platform=node --target=node24 --format=cjs --outfile=dist/index.js --sourcemap --legal-comments=linked",
+    "build": "esbuild src/main.ts --bundle --platform=node --target=node24 --format=cjs --outfile=dist/index.js --sourcemap --legal-comments=linked --external:supports-color",
     "format": "biome format --write src",
     "lint": "biome lint src",
     "check": "biome check src",
@@ -35,10 +35,10 @@
     "@actions/core": "^3.0.1",
     "@actions/exec": "^1.1.1",
     "@actions/github": "^9.1.1",
-    "@instance-labs/cdk-insights-contract": "^0.4.0"
+    "zod": "^3.25.76"
   },
   "overrides": {
-    "brace-expansion": "5.0.8"
+    "brace-expansion": "5.0.9"
   },
   "devDependencies": {
     "@biomejs/biome": "2.0.4",
